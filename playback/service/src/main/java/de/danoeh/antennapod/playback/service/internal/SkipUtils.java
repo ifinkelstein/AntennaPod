@@ -3,10 +3,15 @@ package de.danoeh.antennapod.playback.service.internal;
 import android.content.Context;
 import android.util.Log;
 import de.danoeh.antennapod.event.MessageEvent;
+import de.danoeh.antennapod.model.feed.Chapter;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.model.feed.FeedPreferences;
 import de.danoeh.antennapod.playback.service.R;
+import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import org.greenrobot.eventbus.EventBus;
+
+import java.util.List;
+import java.util.Set;
 
 public final class SkipUtils {
     private static final String TAG = "SkipUtils";
@@ -64,5 +69,52 @@ public final class SkipUtils {
             return true;
         }
         return false;
+    }
+
+    public interface UndoHandler {
+        boolean undo(long position);
+    }
+
+    public static long skipAdIfNecessary(Context context, FeedMedia media, long position, long duration,
+                                         Set<Long> ignoredChapterStarts, UndoHandler undoHandler) {
+        if (!UserPreferences.isAdSkipEnabled()) {
+            return -1;
+        }
+        List<Chapter> chapters = media.getChapters();
+        int index = Chapter.getAfterPosition(chapters, (int) position);
+        if (index < 0) {
+            return -1;
+        }
+        Set<String> kinds = UserPreferences.getAdSkipKinds();
+        Chapter chapter = chapters.get(index);
+        if (!isSkipped(chapter, kinds) || ignoredChapterStarts.contains(chapter.getStart())) {
+            return -1;
+        }
+        long target = duration;
+        for (int i = index + 1; i < chapters.size(); i++) {
+            if (!isSkipped(chapters.get(i), kinds) || ignoredChapterStarts.contains(chapters.get(i).getStart())) {
+                target = chapters.get(i).getStart();
+                break;
+            }
+        }
+        if (target - position < 1000) {
+            return -1;
+        }
+        int skippedSeconds = (int) ((target - position) / 1000);
+        Log.d(TAG, "skipAdIfNecessary: skipping " + skippedSeconds + "s in " + media.getEpisodeTitle());
+        final long chapterStart = chapter.getStart();
+        EventBus.getDefault().post(new MessageEvent(
+                context.getResources().getQuantityString(R.plurals.ad_skipped_snackbar, skippedSeconds, skippedSeconds),
+                ctx -> {
+                    if (undoHandler.undo(position)) {
+                        ignoredChapterStarts.add(chapterStart);
+                    }
+                },
+                context.getString(R.string.undo)));
+        return target;
+    }
+
+    private static boolean isSkipped(Chapter chapter, Set<String> kinds) {
+        return chapter.isSkippable() && kinds.contains(chapter.getSkipKind());
     }
 }

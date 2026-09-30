@@ -13,6 +13,7 @@ dependencies {
     implementation project(':net:common')
     implementation project(':parser:media')
     implementation project(':parser:transcript')
+    implementation project(':storage:database')
 
     implementation libs.commons.io
     implementation libs.commons.lang3

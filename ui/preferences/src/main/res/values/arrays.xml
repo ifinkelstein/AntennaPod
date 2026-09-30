@@ -153,6 +153,28 @@
         <item>sync</item>
     </string-array>
 
+    <string-array name="ad_skip_kinds_entries">
+        <item>@string/ad_skip_kind_ad</item>
+        <item>@string/ad_skip_kind_host_read</item>
+        <item>@string/ad_skip_kind_promo</item>
+        <item>@string/ad_skip_kind_intro</item>
+        <item>@string/ad_skip_kind_outro</item>
+    </string-array>
+
+    <string-array name="ad_skip_kinds_values">
+        <item>ad</item>
+        <item>host_read</item>
+        <item>promo</item>
+        <item>intro</item>
+        <item>outro</item>
+    </string-array>
+
+    <string-array name="ad_skip_kinds_default_value">
+        <item>ad</item>
+        <item>host_read</item>
+        <item>promo</item>
+    </string-array>
+
     <string-array name="mobile_update_default_value">
         <item>images</item>
         <item>sync</item>

@@ -25,6 +25,7 @@ import androidx.media3.session.SessionResult;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import de.danoeh.antennapod.event.AdScanCompletedEvent;
 import de.danoeh.antennapod.event.MessageEvent;
 import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.PlayerErrorEvent;
@@ -77,7 +78,9 @@ import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class Media3PlaybackService extends MediaLibraryService {
@@ -87,6 +90,7 @@ public class Media3PlaybackService extends MediaLibraryService {
     private Player player;
     private MediaLibrarySession mediaSession;
     private FeedMedia currentPlayable;
+    private final Set<Long> undoneAdChapterStarts = new HashSet<>();
     private String pendingStreamMediaId;
     private boolean allowStreamingThisTime = false;
     private Disposable mediaLoaderDisposable;
@@ -448,6 +452,23 @@ public class Media3PlaybackService extends MediaLibraryService {
                                 }
                                 if (SkipUtils.skipEndingIfNecessary(this, currentPlayable, position, duration, speed)) {
                                     player.seekTo(player.getDuration());
+                                    return;
+                                }
+                                if (!player.isPlaying()) {
+                                    return;
+                                }
+                                final long skippedMediaId = currentPlayable.getId();
+                                long adSkipTarget = SkipUtils.skipAdIfNecessary(this, currentPlayable, position,
+                                        duration, undoneAdChapterStarts, target -> {
+                                            if (player == null || currentPlayable == null
+                                                    || currentPlayable.getId() != skippedMediaId) {
+                                                return false;
+                                            }
+                                            player.seekTo(target);
+                                            return true;
+                                        });
+                                if (adSkipTarget >= 0) {
+                                    player.seekTo(adSkipTarget);
                                 }
                             }
                         }, error -> Log.e(TAG, "Position observer error", error));
@@ -520,6 +541,7 @@ public class Media3PlaybackService extends MediaLibraryService {
     @OptIn(markerClass = UnstableApi.class)
     private void switchToPlayable(FeedMedia media) {
         currentPlayable = media;
+        undoneAdChapterStarts.clear();
         currentPlayable.onPlaybackStart();
 
         float speed = PlaybackSpeedUtils.getCurrentPlaybackSpeed(currentPlayable);
@@ -847,6 +869,16 @@ public class Media3PlaybackService extends MediaLibraryService {
             volumeAdaptionFactor = event.getVolumeAdaptionSetting().getAdaptionFactor();
             applyVolumeAdaption(1.0f);
         }
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    @SuppressWarnings("unused")
+    public void adScanCompleted(AdScanCompletedEvent event) {
+        if (currentPlayable == null || currentPlayable.getId() != event.mediaId) {
+            return;
+        }
+        final FeedMedia media = currentPlayable;
+        Schedulers.io().scheduleDirect(() -> ChapterUtils.loadChapters(media, this, true));
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)

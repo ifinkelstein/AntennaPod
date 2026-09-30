@@ -10,6 +10,7 @@ public class Chapter {
     private String link;
     private String imageUrl;
     private String chapterId;
+    private String skipKind;
 
     public Chapter() {
     }
@@ -62,6 +63,18 @@ public class Chapter {
 
     public void setChapterId(String chapterId) {
         this.chapterId = chapterId;
+    }
+
+    public boolean isSkippable() {
+        return skipKind != null;
+    }
+
+    public String getSkipKind() {
+        return skipKind;
+    }
+
+    public void setSkipKind(String skipKind) {
+        this.skipKind = skipKind;
     }
 
     @Override

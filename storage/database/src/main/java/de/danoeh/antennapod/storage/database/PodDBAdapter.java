@@ -55,7 +55,7 @@ public class PodDBAdapter {
 
     private static final String TAG = "PodDBAdapter";
     public static final String DATABASE_NAME = "Antennapod.db";
-    public static final int VERSION = 3110000;
+    public static final int VERSION = 3120000;
 
     /**
      * Maximum number of arguments for IN-operator.
@@ -128,6 +128,7 @@ public class PodDBAdapter {
     public static final String KEY_STATE = "state";
     public static final String KEY_PODCASTINDEX_TRANSCRIPT_URL = "podcastindex_transcript_url";
     public static final String KEY_PODCASTINDEX_TRANSCRIPT_TYPE = "podcastindex_transcript_type";
+    public static final String KEY_AD_SCAN_SEGMENTS = "segments";
 
     // Table names
     public static final String TABLE_NAME_FEEDS = "Feeds";
@@ -138,6 +139,7 @@ public class PodDBAdapter {
     public static final String TABLE_NAME_QUEUE = "Queue";
     public static final String TABLE_NAME_SIMPLECHAPTERS = "SimpleChapters";
     public static final String TABLE_NAME_FAVORITES = "Favorites";
+    public static final String TABLE_NAME_AD_SCANS = "AdScans";
 
     // SQL Statements for creating new tables
     private static final String TABLE_PRIMARY_KEY = KEY_ID
@@ -251,6 +253,11 @@ public class PodDBAdapter {
             + TABLE_NAME_FAVORITES + "(" + KEY_ID + " INTEGER PRIMARY KEY,"
             + KEY_FEEDITEM + " INTEGER," + KEY_FEED + " INTEGER)";
 
+    static final String CREATE_TABLE_AD_SCANS = "CREATE TABLE "
+            + TABLE_NAME_AD_SCANS + "(" + KEY_MEDIA + " INTEGER PRIMARY KEY,"
+            + KEY_STATE + " INTEGER," + KEY_DOWNLOAD_DATE + " INTEGER,"
+            + KEY_AD_SCAN_SEGMENTS + " TEXT)";
+
     /**
      * All the tables in the database
      */
@@ -261,7 +268,8 @@ public class PodDBAdapter {
             TABLE_NAME_DOWNLOAD_LOG,
             TABLE_NAME_QUEUE,
             TABLE_NAME_SIMPLECHAPTERS,
-            TABLE_NAME_FAVORITES
+            TABLE_NAME_FAVORITES,
+            TABLE_NAME_AD_SCANS
     };
 
     public static final String SELECT_KEY_ITEM_ID = "item_id";
@@ -719,7 +727,7 @@ public class PodDBAdapter {
         } else {
             values.put(KEY_READ, FeedItem.UNPLAYED);
         }
-        values.put(KEY_HAS_CHAPTERS, item.getChapters() != null || item.hasChapters());
+        values.put(KEY_HAS_CHAPTERS, hasStorableChapters(item) || item.hasChapters());
         values.put(KEY_ITEM_IDENTIFIER, item.getItemIdentifier());
         values.put(KEY_AUTO_DOWNLOAD_ENABLED, item.isAutoDownloadEnabled());
         values.put(KEY_IMAGE_URL, item.getImageUrl());
@@ -744,10 +752,22 @@ public class PodDBAdapter {
             setMedia(item.getMedia());
             item.getMedia().setItemId(item.getId());
         }
-        if (item.getChapters() != null) {
+        if (hasStorableChapters(item)) {
             setChapters(item);
         }
         return item.getId();
+    }
+
+    private static boolean hasStorableChapters(FeedItem item) {
+        if (item.getChapters() == null) {
+            return false;
+        }
+        for (Chapter chapter : item.getChapters()) {
+            if (chapter.isSkippable()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -937,6 +957,7 @@ public class PodDBAdapter {
             db.delete(TABLE_NAME_DOWNLOAD_LOG, KEY_FEEDFILETYPE + "=" + FeedMedia.FEEDFILETYPE_FEEDMEDIA
                             + " AND " + KEY_FEEDFILE + " IN (" + mediaIds + ")", null);
             db.delete(TABLE_NAME_FEED_MEDIA, KEY_ID + " IN (" + mediaIds + ")", null);
+            db.delete(TABLE_NAME_AD_SCANS, KEY_MEDIA + " IN (" + mediaIds + ")", null);
             db.delete(TABLE_NAME_FEED_ITEMS, KEY_ID + " IN (" + itemIds + ")", null);
             db.delete(TABLE_NAME_FAVORITES, KEY_FEEDITEM + " IN (" + itemIds + ")", null);
             db.setTransactionSuccessful();
@@ -1037,6 +1058,24 @@ public class PodDBAdapter {
                         + "=?", new String[]{String.valueOf(item.getId())}, null,
                 null, null
         );
+    }
+
+    public final Cursor getAdScanCursor(final long mediaId) {
+        return db.query(TABLE_NAME_AD_SCANS, null, KEY_MEDIA + "=?",
+                new String[]{String.valueOf(mediaId)}, null, null, null);
+    }
+
+    public void setAdScan(long mediaId, int state, long downloadDate, String segmentsJson) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_MEDIA, mediaId);
+        values.put(KEY_STATE, state);
+        values.put(KEY_DOWNLOAD_DATE, downloadDate);
+        values.put(KEY_AD_SCAN_SEGMENTS, segmentsJson);
+        db.insertWithOnConflict(TABLE_NAME_AD_SCANS, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public void deleteAdScan(long mediaId) {
+        db.delete(TABLE_NAME_AD_SCANS, KEY_MEDIA + "=?", new String[]{String.valueOf(mediaId)});
     }
 
     public final Cursor getDownloadLog(final int feedFileType, final long feedFileId, final long limit) {
@@ -1599,6 +1638,7 @@ public class PodDBAdapter {
             db.execSQL(CREATE_TABLE_QUEUE);
             db.execSQL(CREATE_TABLE_SIMPLECHAPTERS);
             db.execSQL(CREATE_TABLE_FAVORITES);
+            db.execSQL(CREATE_TABLE_AD_SCANS);
 
             db.execSQL(CREATE_INDEX_FEEDITEMS_FEED);
             db.execSQL(CREATE_INDEX_FEEDITEMS_PUBDATE);
