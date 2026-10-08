@@ -75,6 +75,9 @@ public class ChapterUtils {
             List<Chapter> chaptersFromMediaFile = ChapterUtils.loadChaptersFromMediaFile(playable, context);
             List<Chapter> chaptersMergePhase1 = ChapterMerger.merge(chaptersFromDatabase, chaptersFromMediaFile);
             List<Chapter> chapters = ChapterMerger.merge(chaptersMergePhase1, chaptersFromPodcastIndex);
+            if (playable instanceof FeedMedia) {
+                chapters = AdChapterOverlay.apply(chapters, (FeedMedia) playable, context);
+            }
             if (chapters == null) {
                 // Do not try loading again. There are no chapters or parsing failed.
                 playable.setChapters(Collections.emptyList());

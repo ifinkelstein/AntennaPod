@@ -93,6 +93,17 @@ public abstract class UserPreferences {
     public static final String PREF_PAUSE_PLAYBACK_FOR_FOCUS_LOSS = "prefPauseForFocusLoss";
     private static final String PREF_TIME_RESPECTS_SPEED = "prefPlaybackTimeRespectsSpeed";
     public static final String PREF_STREAM_OVER_DOWNLOAD = "prefStreamOverDownload";
+    public static final String PREF_AD_SKIP_ENABLED = "prefAdSkipEnabled";
+    public static final String PREF_DEEPINFRA_API_KEY = "prefDeepInfraApiKey";
+    public static final String PREF_AD_SKIP_TRANSCRIPTION_URL = "prefAdSkipTranscriptionUrl";
+    public static final String PREF_AD_SKIP_TRANSCRIPTION_MODEL = "prefAdSkipTranscriptionModel";
+    public static final String PREF_AD_SKIP_CHAT_URL = "prefAdSkipChatUrl";
+    public static final String PREF_AD_SKIP_CHAT_MODEL = "prefAdSkipChatModel";
+    public static final String PREF_AD_SKIP_KINDS = "prefAdSkipKinds";
+    public static final String DEFAULT_AD_SKIP_TRANSCRIPTION_URL = "https://api.deepinfra.com/v1/audio/transcriptions";
+    public static final String DEFAULT_AD_SKIP_TRANSCRIPTION_MODEL = "openai/whisper-large-v3-turbo";
+    public static final String DEFAULT_AD_SKIP_CHAT_URL = "https://api.deepinfra.com/v1/openai/chat/completions";
+    public static final String DEFAULT_AD_SKIP_CHAT_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct";
 
     // Network
     private static final String PREF_ENQUEUE_DOWNLOADED = "prefEnqueueDownloaded";
@@ -430,6 +441,40 @@ public abstract class UserPreferences {
 
     public static boolean shouldSkipKeepEpisode() {
         return prefs.getBoolean(PREF_SKIP_KEEPS_EPISODE, true);
+    }
+
+    public static boolean isAdSkipEnabled() {
+        return prefs.getBoolean(PREF_AD_SKIP_ENABLED, false);
+    }
+
+    public static String getDeepInfraApiKey() {
+        return prefs.getString(PREF_DEEPINFRA_API_KEY, "").trim();
+    }
+
+    public static String getAdSkipTranscriptionUrl() {
+        return getNonEmptyString(PREF_AD_SKIP_TRANSCRIPTION_URL, DEFAULT_AD_SKIP_TRANSCRIPTION_URL);
+    }
+
+    public static String getAdSkipTranscriptionModel() {
+        return getNonEmptyString(PREF_AD_SKIP_TRANSCRIPTION_MODEL, DEFAULT_AD_SKIP_TRANSCRIPTION_MODEL);
+    }
+
+    public static String getAdSkipChatUrl() {
+        return getNonEmptyString(PREF_AD_SKIP_CHAT_URL, DEFAULT_AD_SKIP_CHAT_URL);
+    }
+
+    public static String getAdSkipChatModel() {
+        return getNonEmptyString(PREF_AD_SKIP_CHAT_MODEL, DEFAULT_AD_SKIP_CHAT_MODEL);
+    }
+
+    public static Set<String> getAdSkipKinds() {
+        Set<String> defaultValue = new HashSet<>(Arrays.asList("ad", "host_read", "promo"));
+        return new HashSet<>(prefs.getStringSet(PREF_AD_SKIP_KINDS, defaultValue));
+    }
+
+    private static String getNonEmptyString(String key, String defaultValue) {
+        String value = prefs.getString(key, "");
+        return value == null || value.trim().isEmpty() ? defaultValue : value.trim();
     }
 
     public static boolean shouldFavoriteKeepEpisode() {

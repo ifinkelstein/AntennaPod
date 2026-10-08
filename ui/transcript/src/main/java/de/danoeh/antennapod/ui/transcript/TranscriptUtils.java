@@ -7,10 +7,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.nio.charset.Charset;
+import de.danoeh.antennapod.model.feed.AdScan;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.net.common.AntennapodHttpClient;
 import de.danoeh.antennapod.model.feed.Transcript;
+import de.danoeh.antennapod.model.feed.TranscriptType;
 import de.danoeh.antennapod.parser.transcript.TranscriptParser;
+import de.danoeh.antennapod.storage.database.DBReader;
 import okhttp3.CacheControl;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -62,18 +65,22 @@ public class TranscriptUtils {
 
     public static Transcript loadTranscript(FeedMedia media, Boolean forceRefresh) throws InterruptedIOException {
         String transcriptType = media.getItem().getTranscriptType();
+        String transcriptUrl = media.getItem().getTranscriptUrl();
 
         if (!forceRefresh && media.getItem().getTranscript() != null) {
             return media.getTranscript();
         }
 
-        if (!forceRefresh && media.getTranscriptFileUrl() != null) {
+        boolean generated = isGeneratedTranscript(media);
+        if ((!forceRefresh || transcriptUrl == null || generated) && media.getTranscriptFileUrl() != null) {
             File transcriptFile = new File(media.getTranscriptFileUrl());
             try {
                 if (transcriptFile.exists()) {
                     String t = FileUtils.readFileToString(transcriptFile, (String) null);
                     if (StringUtils.isNotEmpty(t)) {
-                        media.setTranscript(TranscriptParser.parse(t, transcriptType));
+                        String type = generated || transcriptType == null
+                                ? TranscriptType.JSON.canonicalMime : transcriptType;
+                        media.setTranscript(TranscriptParser.parse(t, type));
                         return media.getTranscript();
                     }
                 }
@@ -82,12 +89,22 @@ public class TranscriptUtils {
             }
         }
 
-        String transcriptUrl = media.getItem().getTranscriptUrl();
+        if (transcriptUrl == null) {
+            return null;
+        }
         String t = TranscriptUtils.loadTranscriptFromUrl(transcriptUrl, forceRefresh);
         if (StringUtils.isNotEmpty(t)) {
             return TranscriptParser.parse(t, transcriptType);
         }
         return null;
+    }
+
+    public static boolean isGeneratedTranscript(FeedMedia media) {
+        if (media.getItem() != null && media.getItem().getTranscriptUrl() != null) {
+            return false;
+        }
+        AdScan scan = DBReader.loadAdScan(media.getId());
+        return scan != null && scan.getState() == AdScan.STATE_DONE && scan.isValidFor(media);
     }
 
     public static void storeTranscript(FeedMedia media, String transcript) {

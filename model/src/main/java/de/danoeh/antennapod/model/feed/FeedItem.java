@@ -5,6 +5,7 @@ import androidx.annotation.Nullable;
 
 import org.apache.commons.lang3.StringUtils;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.Date;
 import java.util.HashSet;
@@ -480,7 +481,10 @@ public class FeedItem implements Serializable {
     }
 
     public boolean hasTranscript() {
-        return (podcastIndexTranscriptUrl != null);
+        if (podcastIndexTranscriptUrl != null) {
+            return true;
+        }
+        return media != null && media.getTranscriptFileUrl() != null && new File(media.getTranscriptFileUrl()).exists();
     }
 
     @NonNull

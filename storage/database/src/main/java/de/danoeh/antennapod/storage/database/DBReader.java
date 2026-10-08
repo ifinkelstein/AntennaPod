@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import de.danoeh.antennapod.model.feed.AdScan;
+import de.danoeh.antennapod.model.feed.AdSegment;
 import de.danoeh.antennapod.model.feed.Chapter;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedCounter;
@@ -480,6 +482,23 @@ public final class DBReader {
                 String description = cursor.getString(indexDescription);
                 item.setDescriptionIfLonger(description);
             }
+        } finally {
+            adapter.close();
+        }
+    }
+
+    @Nullable
+    public static AdScan loadAdScan(long mediaId) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getAdScanCursor(mediaId)) {
+            if (!cursor.moveToFirst()) {
+                return null;
+            }
+            int state = cursor.getInt(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_STATE));
+            long downloadDate = cursor.getLong(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_DOWNLOAD_DATE));
+            String json = cursor.getString(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_AD_SCAN_SEGMENTS));
+            return new AdScan(mediaId, state, downloadDate, AdSegment.fromJson(json));
         } finally {
             adapter.close();
         }

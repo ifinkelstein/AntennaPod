@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 
 import de.danoeh.antennapod.model.MediaMetadataRetrieverCompat;
 import de.danoeh.antennapod.model.feed.Feed;
+import de.danoeh.antennapod.net.download.service.episode.adscan.AdScanWorker;
 import de.danoeh.antennapod.net.sync.serviceinterface.SynchronizationQueue;
 import de.danoeh.antennapod.ui.chapters.ChapterUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -101,6 +102,7 @@ public class MediaDownloadedHandler implements Runnable {
                 // to ensure subscribers will get the updated FeedMedia as well
                 DBWriter.setFeedItem(item, broadcastUnreadStateUpdate).get();
             }
+            AdScanWorker.enqueue(context, media);
         } catch (InterruptedException e) {
             Log.e(TAG, "MediaHandlerThread was interrupted");
         } catch (ExecutionException e) {

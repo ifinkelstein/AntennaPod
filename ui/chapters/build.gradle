@@ -19,6 +19,8 @@ dependencies {
     implementation project(':parser:feed')
     implementation project(':parser:transcript')
     implementation project(':storage:database')
+    implementation project(':ui:i18n')
+    implementation project(':storage:preferences')
 
     annotationProcessor libs.androidx.annotation
     implementation libs.commons.io

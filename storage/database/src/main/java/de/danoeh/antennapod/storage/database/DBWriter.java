@@ -43,6 +43,8 @@ import de.danoeh.antennapod.event.FeedEvent;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.model.download.DownloadResult;
+import de.danoeh.antennapod.model.feed.AdScan;
+import de.danoeh.antennapod.model.feed.AdSegment;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedMedia;
@@ -147,6 +149,7 @@ public class DBWriter {
             PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
             adapter.setMediaDownloadInformation(media);
+            adapter.deleteAdScan(media.getId());
             adapter.close();
         }
 
@@ -742,6 +745,16 @@ public class DBWriter {
             PodDBAdapter adapter = PodDBAdapter.getInstance();
             adapter.open();
             adapter.setMedia(media);
+            adapter.close();
+        });
+    }
+
+    public static Future<?> setAdScan(final AdScan scan) {
+        return runOnDbThread(() -> {
+            PodDBAdapter adapter = PodDBAdapter.getInstance();
+            adapter.open();
+            adapter.setAdScan(scan.getMediaId(), scan.getState(), scan.getDownloadDate(),
+                    AdSegment.toJson(scan.getSegments()));
             adapter.close();
         });
     }

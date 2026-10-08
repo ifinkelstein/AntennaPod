@@ -4,8 +4,10 @@ import android.app.Activity;
 import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
+import android.text.InputType;
 import androidx.annotation.NonNull;
 import androidx.collection.ArrayMap;
+import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import de.danoeh.antennapod.R;
@@ -27,6 +29,35 @@ public class PlaybackPreferencesFragment extends AnimatedPreferenceFragment {
 
         setupPlaybackScreen();
         buildSmartMarkAsPlayedPreference();
+        setupAdSkipPreferences();
+    }
+
+    private void setupAdSkipPreferences() {
+        EditTextPreference apiKey = findPreference(UserPreferences.PREF_DEEPINFRA_API_KEY);
+        apiKey.setOnBindEditTextListener(editText -> editText.setInputType(
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD));
+        setupAdSkipTextPreference(UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_URL,
+                UserPreferences.DEFAULT_AD_SKIP_TRANSCRIPTION_URL);
+        setupAdSkipTextPreference(UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_MODEL,
+                UserPreferences.DEFAULT_AD_SKIP_TRANSCRIPTION_MODEL);
+        setupAdSkipTextPreference(UserPreferences.PREF_AD_SKIP_CHAT_URL,
+                UserPreferences.DEFAULT_AD_SKIP_CHAT_URL);
+        setupAdSkipTextPreference(UserPreferences.PREF_AD_SKIP_CHAT_MODEL,
+                UserPreferences.DEFAULT_AD_SKIP_CHAT_MODEL);
+    }
+
+    private void setupAdSkipTextPreference(String key, String defaultValue) {
+        EditTextPreference preference = findPreference(key);
+        preference.setSummaryProvider(p -> {
+            String value = ((EditTextPreference) p).getText();
+            return value == null || value.trim().isEmpty() ? defaultValue : value.trim();
+        });
+        preference.setOnBindEditTextListener(editText -> {
+            editText.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+            if (editText.getText().length() == 0) {
+                editText.setText(defaultValue);
+            }
+        });
     }
 
     @Override

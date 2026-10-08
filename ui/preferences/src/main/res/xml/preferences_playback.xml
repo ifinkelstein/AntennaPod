@@ -42,6 +42,49 @@
                 android:title="@string/playback_speed"/>
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/pref_ad_skip_category">
+        <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:enabled="true"
+                android:key="prefAdSkipEnabled"
+                android:summary="@string/pref_ad_skip_sum"
+                android:title="@string/pref_ad_skip_title"/>
+        <de.danoeh.antennapod.ui.preferences.preference.MaterialMultiSelectListPreference
+                android:defaultValue="@array/ad_skip_kinds_default_value"
+                android:dependency="prefAdSkipEnabled"
+                android:entries="@array/ad_skip_kinds_entries"
+                android:entryValues="@array/ad_skip_kinds_values"
+                android:key="prefAdSkipKinds"
+                android:summary="@string/pref_ad_skip_kinds_sum"
+                android:title="@string/pref_ad_skip_kinds_title"/>
+        <EditTextPreference
+                android:dependency="prefAdSkipEnabled"
+                android:key="prefDeepInfraApiKey"
+                android:summary="@string/pref_deepinfra_api_key_sum"
+                android:title="@string/pref_deepinfra_api_key_title"
+                search:ignore="true" />
+        <EditTextPreference
+                android:dependency="prefAdSkipEnabled"
+                android:key="prefAdSkipTranscriptionUrl"
+                android:title="@string/pref_ad_skip_transcription_url_title"
+                search:ignore="true" />
+        <EditTextPreference
+                android:dependency="prefAdSkipEnabled"
+                android:key="prefAdSkipTranscriptionModel"
+                android:title="@string/pref_ad_skip_transcription_model_title"
+                search:ignore="true" />
+        <EditTextPreference
+                android:dependency="prefAdSkipEnabled"
+                android:key="prefAdSkipChatUrl"
+                android:title="@string/pref_ad_skip_chat_url_title"
+                search:ignore="true" />
+        <EditTextPreference
+                android:dependency="prefAdSkipEnabled"
+                android:key="prefAdSkipChatModel"
+                android:title="@string/pref_ad_skip_chat_model_title"
+                search:ignore="true" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/reassign_hardware_buttons">
         <de.danoeh.antennapod.ui.preferences.preference.MaterialListPreference
                 android:defaultValue="@string/keycode_media_fast_forward"

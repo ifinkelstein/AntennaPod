@@ -73,6 +73,8 @@ public class ChaptersListAdapter extends RecyclerView.Adapter<ChaptersListAdapte
         }
         holder.duration.setText(context.getString(R.string.chapter_duration,
                 Converter.getDurationStringLocalized(context, (int) duration)));
+        holder.title.setAlpha(sc.isSkippable() ? 0.5f : 1.0f);
+        holder.duration.setAlpha(sc.isSkippable() ? 0.5f : 1.0f);
 
         if (TextUtils.isEmpty(sc.getLink())) {
             holder.link.setVisibility(View.GONE);
