@@ -756,6 +756,11 @@ public class DBWriter {
             adapter.setAdScan(scan.getMediaId(), scan.getState(), scan.getDownloadDate(),
                     AdSegment.toJson(scan.getSegments()));
             adapter.close();
+            // Lets episode lists and the episode screen show the new scan state
+            FeedMedia media = DBReader.getFeedMedia(scan.getMediaId());
+            if (media != null && media.getItem() != null) {
+                EventBus.getDefault().post(new FeedItemEvent(Collections.singletonList(media.getItem()), false));
+            }
         });
     }
 

@@ -72,6 +72,19 @@
                 tools:visibility="visible" />
 
             <ImageButton
+                android:id="@+id/butAdScan"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackground"
+                android:contentDescription="@string/ad_scan_details_title"
+                android:scaleType="fitXY"
+                android:padding="12dp"
+                android:visibility="gone"
+                app:tint="@android:color/white"
+                app:srcCompat="@drawable/ic_skip_24dp"
+                tools:visibility="visible" />
+
+            <ImageButton
                 android:id="@+id/butShowSettings"
                 android:layout_width="48dp"
                 android:layout_height="48dp"

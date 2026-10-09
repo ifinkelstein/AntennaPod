@@ -1,20 +1,31 @@
 package de.danoeh.antennapod.net.download.service.episode.adscan;
 
+import android.app.Notification;
 import android.content.Context;
+import android.content.pm.ServiceInfo;
+import android.os.Build;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
+import androidx.core.app.NotificationCompat;
+import androidx.lifecycle.LiveData;
 import androidx.work.BackoffPolicy;
 import androidx.work.Constraints;
 import androidx.work.Data;
 import androidx.work.ExistingWorkPolicy;
+import androidx.work.ForegroundInfo;
 import androidx.work.NetworkType;
 import androidx.work.OneTimeWorkRequest;
+import androidx.work.OutOfQuotaPolicy;
+import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
+
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import de.danoeh.antennapod.event.AdScanCompletedEvent;
 import de.danoeh.antennapod.event.MessageEvent;
@@ -30,6 +41,7 @@ import de.danoeh.antennapod.net.download.service.R;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
+import de.danoeh.antennapod.ui.notifications.NotificationUtils;
 import de.danoeh.antennapod.ui.transcript.TranscriptUtils;
 import org.apache.commons.io.FileUtils;
 import org.greenrobot.eventbus.EventBus;
@@ -52,6 +64,11 @@ public class AdScanWorker extends Worker {
     // With a 5 minute exponential backoff, five attempts span roughly 75 minutes
     private static final int MAX_ATTEMPTS = 5;
     private static final String TRANSCRIPT_CACHE_DIR = "adscan-transcripts";
+    public static final String PROGRESS_STAGE = "stage";
+    public static final String PROGRESS_PART = "part";
+    public static final String PROGRESS_PARTS = "parts";
+    public static final String STAGE_TRANSCRIBING = "transcribing";
+    public static final String STAGE_DETECTING = "detecting";
 
     public AdScanWorker(@NonNull Context context, @NonNull WorkerParameters params) {
         super(context, params);
@@ -141,11 +158,61 @@ public class AdScanWorker extends Worker {
         OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(AdScanWorker.class)
                 .addTag(WORK_TAG)
                 .setConstraints(constraints.build())
+                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5, TimeUnit.MINUTES)
                 .setInputData(new Data.Builder().putLong(WORK_DATA_MEDIA_ID, media.getId()).build())
                 .build();
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK_TAG + media.getId(),
-                ExistingWorkPolicy.REPLACE, request);
+        // KEEP: a scan that is already queued or running continues instead of being started twice
+        WorkManager.getInstance(context).enqueueUniqueWork(uniqueWorkName(media.getId()),
+                ExistingWorkPolicy.KEEP, request);
+    }
+
+    public static String uniqueWorkName(long mediaId) {
+        return WORK_TAG + mediaId;
+    }
+
+    public static LiveData<List<WorkInfo>> observe(Context context, long mediaId) {
+        return WorkManager.getInstance(context).getWorkInfosForUniqueWorkLiveData(uniqueWorkName(mediaId));
+    }
+
+    @NonNull
+    @Override
+    public ListenableFuture<ForegroundInfo> getForegroundInfoAsync() {
+        return Futures.immediateFuture(createForegroundInfo(null));
+    }
+
+    private ForegroundInfo createForegroundInfo(@Nullable String episodeTitle) {
+        Context context = getApplicationContext();
+        Notification notification = new NotificationCompat.Builder(context, NotificationUtils.CHANNEL_ID_DOWNLOADING)
+                .setContentTitle(context.getString(R.string.ad_scan_notification_title))
+                .setContentText(episodeTitle)
+                .setSmallIcon(R.drawable.ic_notification_sync)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setShowWhen(false)
+                .build();
+        if (Build.VERSION.SDK_INT >= 29) {
+            return new ForegroundInfo(R.id.notification_ad_scan, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+        }
+        return new ForegroundInfo(R.id.notification_ad_scan, notification);
+    }
+
+    /**
+     * Runs the scan as a foreground service so Doze and the 10 minute job limit cannot cut off a request.
+     * Android refuses this while the app is in the background; the scan then continues as a normal job.
+     */
+    private void tryRunInForeground(String episodeTitle) {
+        try {
+            setForegroundAsync(createForegroundInfo(episodeTitle)).get();
+        } catch (Exception e) {
+            Log.d(TAG, "Running ad scan in background: " + e.getMessage());
+        }
+    }
+
+    private void reportProgress(String stage, int part, int parts) {
+        setProgressAsync(new Data.Builder().putString(PROGRESS_STAGE, stage)
+                .putInt(PROGRESS_PART, part).putInt(PROGRESS_PARTS, parts).build());
     }
 
     @NonNull
@@ -173,18 +240,11 @@ public class AdScanWorker extends Worker {
         DeepInfraClient client = new DeepInfraClient(UserPreferences.getDeepInfraApiKey(),
                 UserPreferences.getAdSkipTranscriptionUrl(), UserPreferences.getAdSkipTranscriptionModel(),
                 UserPreferences.getAdSkipChatUrl(), UserPreferences.getAdSkipChatModel());
-        File workDir = new File(getApplicationContext().getCacheDir(), "adscan-" + mediaId);
+        tryRunInForeground(media.getEpisodeTitle());
+        // Per-run directory: a stopped run may still be cleaning up while its replacement starts
+        File workDir = new File(getApplicationContext().getCacheDir(), "adscan-" + mediaId + "-" + getId());
         try {
-            List<AudioChunker.Chunk> chunks = new ArrayList<>();
-            if (AudioChunker.needsChunking(file)) {
-                FileUtils.deleteQuietly(workDir);
-                if (!workDir.mkdirs()) {
-                    throw new IOException("Could not create work directory");
-                }
-                chunks = AudioChunker.split(file, workDir);
-            } else {
-                chunks.add(new AudioChunker.Chunk(file, 0, media.getMimeType()));
-            }
+            List<AudioChunker.Chunk> chunks = splitIntoChunks(file, media, workDir);
 
             // Transcription is the expensive step, so finished chunks are cached and not paid for again on retry
             List<TranscriptSegment> transcript = new ArrayList<>();
@@ -192,15 +252,21 @@ public class AdScanWorker extends Worker {
                 if (isStopped()) {
                     return Result.retry();
                 }
-                File cached = transcriptCacheFile(mediaId, downloadDate, i);
+                reportProgress(STAGE_TRANSCRIBING, i + 1, chunks.size());
+                AudioChunker.Chunk chunk = chunks.get(i);
+                File cached = transcriptCacheFile(mediaId, downloadDate, chunk);
                 List<TranscriptSegment> chunkTranscript = readCachedTranscript(cached);
                 if (chunkTranscript == null) {
-                    AudioChunker.Chunk chunk = chunks.get(i);
                     chunkTranscript = client.transcribe(chunk.file, chunk.mimeType, chunk.offsetMs);
                     writeCachedTranscript(cached, chunkTranscript);
                 }
                 transcript.addAll(chunkTranscript);
             }
+            if (isStopped()) {
+                return Result.retry();
+            }
+            reportProgress(STAGE_DETECTING, 0, 0);
+            // Saved even if the run was stopped meanwhile: the requests are paid for and storing is instant
             List<AdSegment> segments = new AdDetector(client).detect(transcript);
 
             FeedMedia current = DBReader.getFeedMedia(mediaId);
@@ -266,9 +332,34 @@ public class AdScanWorker extends Worker {
         }
     }
 
-    private File transcriptCacheFile(long mediaId, long downloadDate, int chunkIndex) {
+    private static List<AudioChunker.Chunk> splitIntoChunks(File file, FeedMedia media, File workDir)
+            throws IOException {
+        List<AudioChunker.Chunk> wholeFile = Collections.singletonList(
+                new AudioChunker.Chunk(file, 0, media.getMimeType()));
+        boolean tooBig = AudioChunker.needsChunking(file);
+        boolean tooLong = media.getDuration() * 1000L > AudioChunker.MAX_CHUNK_DURATION_US;
+        if (!tooBig && !tooLong) {
+            return wholeFile;
+        }
+        FileUtils.deleteQuietly(workDir);
+        if (!workDir.mkdirs()) {
+            throw new IOException("Could not create work directory");
+        }
+        try {
+            return AudioChunker.split(file, workDir);
+        } catch (AudioChunker.UnsupportedFormatException e) {
+            if (tooBig) {
+                throw e;
+            }
+            // Splitting only shortens requests; a file under the upload limit can still be sent whole
+            return wholeFile;
+        }
+    }
+
+    private File transcriptCacheFile(long mediaId, long downloadDate, AudioChunker.Chunk chunk) {
         File dir = new File(getApplicationContext().getCacheDir(), TRANSCRIPT_CACHE_DIR);
-        return new File(dir, mediaId + "-" + downloadDate + "-" + chunkIndex + ".json");
+        // Offset and size identify the chunk even if the chunking parameters change between runs
+        return new File(dir, mediaId + "-" + downloadDate + "-" + chunk.offsetMs + "-" + chunk.file.length() + ".json");
     }
 
     private void deleteTranscriptCache(long mediaId) {

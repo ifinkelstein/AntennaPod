@@ -13,6 +13,7 @@ import android.widget.Button;
 import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.work.WorkInfo;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.bitmap.FitCenter;
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
@@ -41,8 +42,13 @@ import de.danoeh.antennapod.event.FeedItemEvent;
 import de.danoeh.antennapod.event.FeedListUpdateEvent;
 import de.danoeh.antennapod.event.MessageEvent;
 import de.danoeh.antennapod.event.PlayerStatusEvent;
+import de.danoeh.antennapod.model.feed.AdScan;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
+import de.danoeh.antennapod.net.download.service.episode.adscan.AdScanWorker;
+import de.danoeh.antennapod.ui.episodeslist.AdScanActions;
+import de.danoeh.antennapod.ui.episodeslist.AdScanDialogs;
+import de.danoeh.antennapod.ui.episodeslist.AdScanUi;
 import de.danoeh.antennapod.model.feed.FeedMedia;
 import de.danoeh.antennapod.net.download.serviceinterface.DownloadServiceInterface;
 import de.danoeh.antennapod.playback.service.PlaybackController;
@@ -102,6 +108,8 @@ public class ItemFragment extends Fragment {
     private ItemActionButton actionButton2;
     private Disposable disposable;
     private FeeditemFragmentBinding viewBinding;
+    private long observedAdScanMediaId = -1;
+    @Nullable private WorkInfo adScanWork;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -116,6 +124,8 @@ public class ItemFragment extends Fragment {
         viewBinding = FeeditemFragmentBinding.inflate(inflater, container, false);
         viewBinding.header.setVisibility(View.INVISIBLE);
         viewBinding.txtvPodcast.setOnClickListener(v -> openPodcast());
+        viewBinding.adScanStatus.setOnClickListener(v -> onAdScanStatusClicked());
+        observedAdScanMediaId = -1;
         viewBinding.txtvTitle.setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_FULL);
         viewBinding.txtvTitle.setEllipsize(TextUtils.TruncateAt.END);
         viewBinding.webvDescription.setTimecodeSelectedListener(time -> {
@@ -254,6 +264,52 @@ public class ItemFragment extends Fragment {
                     "https://127.0.0.1", webviewData, "text/html", "utf-8", "about:blank");
         }
         updateAppearance();
+        observeAdScan();
+        updateAdScanStatus();
+    }
+
+    private void observeAdScan() {
+        FeedMedia media = item.getMedia();
+        if (media == null || media.getId() == observedAdScanMediaId) {
+            return;
+        }
+        observedAdScanMediaId = media.getId();
+        AdScanWorker.observe(requireContext(), media.getId()).observe(getViewLifecycleOwner(), infos -> {
+            adScanWork = null;
+            for (WorkInfo info : infos) {
+                if (adScanWork == null || !info.getState().isFinished()) {
+                    adScanWork = info;
+                }
+            }
+            updateAdScanStatus();
+        });
+    }
+
+    private void updateAdScanStatus() {
+        if (viewBinding == null || item == null) {
+            return;
+        }
+        FeedMedia media = item.getMedia();
+        if (!AdScanUi.isRelevant(media)) {
+            viewBinding.adScanStatus.setVisibility(View.GONE);
+            return;
+        }
+        AdScan scan = media.getAdScan();
+        viewBinding.adScanStatus.setText(AdScanUi.describe(requireContext(), scan, adScanWork));
+        viewBinding.adScanStatus.setCompoundDrawablesRelativeWithIntrinsicBounds(AdScanUi.iconFor(scan), 0, 0, 0);
+        viewBinding.adScanStatus.setVisibility(View.VISIBLE);
+    }
+
+    private void onAdScanStatusClicked() {
+        if (item == null || item.getMedia() == null) {
+            return;
+        }
+        AdScan scan = item.getMedia().getAdScan();
+        if (AdScanUi.canStart(scan, adScanWork)) {
+            AdScanActions.scanEpisodes(requireContext(), Collections.singletonList(item));
+        } else if (scan != null && scan.getState() == AdScan.STATE_DONE) {
+            AdScanDialogs.showEpisodeResult(requireContext(), item);
+        }
     }
 
     private void updateAppearance() {

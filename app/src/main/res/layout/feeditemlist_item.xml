@@ -129,6 +129,14 @@
                     app:tint="?attr/colorOnSurfaceVariant"
                     app:srcCompat="@drawable/ic_playlist_play" />
 
+                <ImageView
+                    android:id="@+id/adScanStatus"
+                    android:layout_width="12sp"
+                    android:layout_height="12sp"
+                    android:visibility="gone"
+                    app:tint="?attr/colorOnSurfaceVariant"
+                    app:srcCompat="@drawable/ic_skip_24dp" />
+
                 <TextView
                     android:id="@+id/separatorIcons"
                     android:layout_width="wrap_content"

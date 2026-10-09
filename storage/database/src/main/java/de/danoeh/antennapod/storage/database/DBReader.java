@@ -119,6 +119,29 @@ public final class DBReader {
             }
             item.setFeed(feed);
         }
+        loadAdScansOfItemList(items);
+    }
+
+    private static void loadAdScansOfItemList(List<FeedItem> items) {
+        Map<Long, FeedMedia> mediaById = new ArrayMap<>();
+        for (FeedItem item : items) {
+            if (item.getMedia() != null && item.getMedia().isDownloaded()) {
+                mediaById.put(item.getMedia().getId(), item.getMedia());
+            }
+        }
+        if (mediaById.isEmpty()) {
+            return;
+        }
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getAdScansCursor(new ArrayList<>(mediaById.keySet()))) {
+            while (cursor.moveToNext()) {
+                AdScan scan = extractAdScan(cursor);
+                mediaById.get(scan.getMediaId()).setAdScan(scan);
+            }
+        } finally {
+            adapter.close();
+        }
     }
 
     /**
@@ -141,6 +164,7 @@ public final class DBReader {
             for (FeedItem item : items) {
                 item.setFeed(feed);
             }
+            loadAdScansOfItemList(items);
             return items;
         } finally {
             adapter.close();

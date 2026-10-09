@@ -14,7 +14,8 @@ import java.util.List;
 
 public class AudioChunker {
     public static final long MAX_UPLOAD_BYTES = 24L * 1024 * 1024;
-    public static final long MAX_CHUNK_DURATION_US = 15L * 60 * 1000 * 1000;
+    // Short chunks keep each upload brief, so an interrupted request loses little work
+    public static final long MAX_CHUNK_DURATION_US = 10L * 60 * 1000 * 1000;
     private static final int AAC_PROFILE_LC = 2;
 
     public static class Chunk {

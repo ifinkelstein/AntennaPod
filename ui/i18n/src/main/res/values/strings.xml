@@ -505,6 +505,36 @@
     <string name="detect_ads_label">Detect ads</string>
     <string name="detect_ads_feed_label">Detect ads in downloaded episodes</string>
     <string name="detect_ads_nothing_to_scan">All downloaded episodes are already scanned</string>
+    <string name="ad_scan_notification_title">Detecting ads</string>
+    <string name="ad_scan_details_title">Ad detection</string>
+    <string name="ad_scan_rescan">Scan again</string>
+    <string name="ad_scan_status_not_scanned">Not scanned for ads yet. Tap to detect ads</string>
+    <string name="ad_scan_status_paused">Ad detection paused. Tap to resume</string>
+    <string name="ad_scan_status_queued">Detecting ads: waiting for network or battery</string>
+    <string name="ad_scan_status_running">Detecting ads…</string>
+    <string name="ad_scan_status_transcribing">Detecting ads: transcribing part %1$d of %2$d</string>
+    <string name="ad_scan_status_detecting">Detecting ads: finding ads in the transcript</string>
+    <string name="ad_scan_status_retrying">Detecting ads: waiting to retry after an error</string>
+    <string name="ad_scan_status_failed">Ad detection failed. Tap to retry</string>
+    <string name="ad_scan_status_skipped">Ad detection is not possible for this file</string>
+    <string name="ad_scan_status_none">No ads found</string>
+    <plurals name="ad_scan_status_found">
+        <item quantity="one">%1$d section marked, %2$s skipped</item>
+        <item quantity="other">%1$d sections marked, %2$s skipped</item>
+    </plurals>
+    <string name="ad_scan_segment_line">%1$s %2$s – %3$s (%4$s), %5$s</string>
+    <string name="ad_scan_segment_skipped">skipped</string>
+    <string name="ad_scan_segment_kept">played</string>
+    <string name="ad_scan_feed_summary">%1$d downloaded episodes: %2$d scanned, %3$d in progress, %4$d not scanned, %5$d failed</string>
+    <plurals name="ad_scan_feed_total">
+        <item quantity="one">%1$d section marked, %2$s skipped in total</item>
+        <item quantity="other">%1$d sections marked, %2$s skipped in total</item>
+    </plurals>
+    <plurals name="ad_scan_feed_scan_remaining">
+        <item quantity="one">Scan %d episode</item>
+        <item quantity="other">Scan %d episodes</item>
+    </plurals>
+    <string name="ad_scan_feed_none_downloaded">No downloaded episodes. Ads are detected after an episode is downloaded.</string>
     <plurals name="detect_ads_queued_message">
         <item quantity="one">Scanning %d episode for ads</item>
         <item quantity="other">Scanning %d episodes for ads</item>

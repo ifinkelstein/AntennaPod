@@ -33,9 +33,12 @@ import de.danoeh.antennapod.event.PlayerStatusEvent;
 import de.danoeh.antennapod.event.QueueEvent;
 import de.danoeh.antennapod.event.playback.PlaybackPositionEvent;
 import de.danoeh.antennapod.model.download.DownloadResult;
+import de.danoeh.antennapod.model.feed.AdScan;
 import de.danoeh.antennapod.model.feed.Feed;
 import de.danoeh.antennapod.model.feed.FeedItem;
 import de.danoeh.antennapod.model.feed.FeedItemFilter;
+import de.danoeh.antennapod.net.download.service.episode.adscan.AdScanWorker;
+import de.danoeh.antennapod.ui.episodeslist.AdScanDialogs;
 import de.danoeh.antennapod.net.download.serviceinterface.FeedUpdateManager;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.database.DBWriter;
@@ -414,6 +417,7 @@ public class FeedItemlistFragment extends Fragment implements AdapterView.OnItem
                 return;
             }
         }
+        refreshAdScanButton();
     }
 
     @Subscribe(sticky = true, threadMode = ThreadMode.MAIN)
@@ -531,6 +535,7 @@ public class FeedItemlistFragment extends Fragment implements AdapterView.OnItem
         viewBinding.header.butShowInfo.setVisibility(!isNotSubscribed ? View.VISIBLE : View.GONE);
         viewBinding.header.butFilter.setVisibility(showSettingsButtons ? View.VISIBLE : View.GONE);
         viewBinding.header.butShowSettings.setVisibility(showSettingsButtons ? View.VISIBLE : View.GONE);
+        refreshAdScanButton();
         viewBinding.header.butSubscribe.setVisibility(isNotSubscribed ? View.VISIBLE : View.GONE);
         viewBinding.header.butRestore.setVisibility(isArchived ? View.VISIBLE : View.GONE);
 
@@ -539,7 +544,32 @@ public class FeedItemlistFragment extends Fragment implements AdapterView.OnItem
         }
     }
 
+    private void refreshAdScanButton() {
+        if (viewBinding == null || feed == null) {
+            return;
+        }
+        boolean show = feed.getState() == Feed.STATE_SUBSCRIBED && AdScanWorker.isEnabled();
+        viewBinding.header.butAdScan.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show || feed.getItems() == null) {
+            return;
+        }
+        boolean scanning = false;
+        for (FeedItem item : feed.getItems()) {
+            AdScan scan = item.getMedia() != null ? item.getMedia().getAdScan() : null;
+            if (scan != null && scan.getState() == AdScan.STATE_PENDING) {
+                scanning = true;
+                break;
+            }
+        }
+        viewBinding.header.butAdScan.setImageResource(scanning ? R.drawable.ic_hourglass : R.drawable.ic_skip_24dp);
+    }
+
     private void setupHeaderView() {
+        viewBinding.header.butAdScan.setOnClickListener(v -> {
+            if (feed != null) {
+                AdScanDialogs.showFeedStatus(requireContext(), feed);
+            }
+        });
         // https://github.com/bumptech/glide/issues/529
         viewBinding.imgvBackground.setColorFilter(new LightingColorFilter(0xff666666, 0x000000));
         viewBinding.header.butShowInfo.setOnClickListener(v -> showFeedInfo());

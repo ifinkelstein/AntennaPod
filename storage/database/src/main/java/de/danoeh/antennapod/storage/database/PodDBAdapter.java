@@ -1065,6 +1065,11 @@ public class PodDBAdapter {
                 new String[]{String.valueOf(mediaId)}, null, null, null);
     }
 
+    public final Cursor getAdScansCursor(final List<Long> mediaIds) {
+        return db.query(TABLE_NAME_AD_SCANS, null,
+                KEY_MEDIA + " IN (" + TextUtils.join(",", mediaIds) + ")", null, null, null, null);
+    }
+
     public final Cursor getAdScansCursorByState(final int... states) {
         StringBuilder in = new StringBuilder();
         for (int state : states) {

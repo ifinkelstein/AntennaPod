@@ -43,6 +43,7 @@ public class FeedMedia implements Playable {
     private String mimeType;
     @Nullable private volatile FeedItem item;
     private Date lastPlayedTimeHistory;
+    @Nullable private transient AdScan adScan;
 
     // if null: unknown, will be checked
     private Boolean hasEmbeddedPicture;
@@ -503,6 +504,18 @@ public class FeedMedia implements Playable {
             return null;
         }
         return getLocalFileUrl() + ".transcript";
+    }
+
+    /**
+     * Ad scan of the current download, or null if there is none. Only filled in by list queries.
+     */
+    @Nullable
+    public AdScan getAdScan() {
+        return adScan != null && adScan.isValidFor(this) ? adScan : null;
+    }
+
+    public void setAdScan(@Nullable AdScan adScan) {
+        this.adScan = adScan;
     }
 
     public void setTranscript(Transcript t) {
