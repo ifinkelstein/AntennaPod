@@ -100,6 +100,7 @@ public abstract class UserPreferences {
     public static final String PREF_AD_SKIP_CHAT_URL = "prefAdSkipChatUrl";
     public static final String PREF_AD_SKIP_CHAT_MODEL = "prefAdSkipChatModel";
     public static final String PREF_AD_SKIP_KINDS = "prefAdSkipKinds";
+    public static final String PREF_AD_SKIP_FADE = "prefAdSkipFade";
     public static final String DEFAULT_AD_SKIP_TRANSCRIPTION_URL = "https://api.deepinfra.com/v1/audio/transcriptions";
     public static final String DEFAULT_AD_SKIP_TRANSCRIPTION_MODEL = "openai/whisper-large-v3-turbo";
     public static final String DEFAULT_AD_SKIP_CHAT_URL = "https://api.deepinfra.com/v1/openai/chat/completions";
@@ -468,6 +469,10 @@ public abstract class UserPreferences {
         String model = getNonEmptyString(PREF_AD_SKIP_CHAT_MODEL, DEFAULT_AD_SKIP_CHAT_MODEL);
         // The settings dialog pre-fills the default, so the retired default may have been saved explicitly
         return LEGACY_AD_SKIP_CHAT_MODEL.equals(model) ? DEFAULT_AD_SKIP_CHAT_MODEL : model;
+    }
+
+    public static boolean isAdSkipFadeEnabled() {
+        return prefs.getBoolean(PREF_AD_SKIP_FADE, true);
     }
 
     public static Set<String> getAdSkipKinds() {

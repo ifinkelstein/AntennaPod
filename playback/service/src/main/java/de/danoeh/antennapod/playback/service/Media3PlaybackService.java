@@ -54,6 +54,7 @@ import de.danoeh.antennapod.playback.cast.CastPlayerWrapper;
 import de.danoeh.antennapod.playback.service.internal.ExoPlayerUtils;
 import de.danoeh.antennapod.playback.service.internal.MediaLibrarySessionCallback;
 import de.danoeh.antennapod.playback.service.internal.PlayableUtils;
+import de.danoeh.antennapod.playback.service.internal.SkipFader;
 import de.danoeh.antennapod.playback.service.internal.SkipUtils;
 import de.danoeh.antennapod.playback.service.internal.SleepTimer;
 import de.danoeh.antennapod.playback.service.internal.ClockSleepTimer;
@@ -96,6 +97,15 @@ public class Media3PlaybackService extends MediaLibraryService {
     private final Set<Long> undoneAdChapterStarts = new HashSet<>();
     private final Handler adSkipHandler = new Handler(Looper.getMainLooper());
     private final Runnable adSkipCheck = this::checkAdSkip;
+    private static final long SKIP_FADE_MS = 300;
+    private float skipFadeVolume = 1;
+    private float baseVolume = 1;
+    private final SkipFader skipFader = new SkipFader(adSkipHandler, volume -> {
+        skipFadeVolume = volume;
+        if (player != null) {
+            applyVolumeAdaption(baseVolume);
+        }
+    });
     private String pendingStreamMediaId;
     private boolean allowStreamingThisTime = false;
     private Disposable mediaLoaderDisposable;
@@ -400,6 +410,10 @@ public class Media3PlaybackService extends MediaLibraryService {
 
         @Override
         public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+            if (!playWhenReady) {
+                // Never leave the player muted by a fade that a pause interrupted
+                skipFader.set(1);
+            }
             PlaybackService.isRunning = !Util.shouldShowPlayButton(player);
             updatePlaybackPreferences();
         }
@@ -560,7 +574,12 @@ public class Media3PlaybackService extends MediaLibraryService {
      */
     private void checkAdSkip() {
         adSkipHandler.removeCallbacks(adSkipCheck);
+        if (skipFader.isFadingOut()) {
+            // The fade-out ends by checking again, right at the start of the section
+            return;
+        }
         if (currentPlayable == null || player == null || !player.getPlayWhenReady()) {
+            skipFader.set(1);
             return;
         }
         long position = player.getCurrentPosition();
@@ -577,15 +596,32 @@ public class Media3PlaybackService extends MediaLibraryService {
                     player.seekTo(target);
                     return true;
                 });
+        boolean fade = UserPreferences.isAdSkipFadeEnabled();
         if (adSkipTarget >= 0) {
-            player.seekTo(adSkipTarget);
+            if (fade) {
+                // Silent when the section was entered without a fade-out, e.g. playback started inside it
+                skipFader.set(0);
+                player.seekTo(adSkipTarget);
+                skipFader.fadeIn(SKIP_FADE_MS);
+            } else {
+                player.seekTo(adSkipTarget);
+            }
             return;
+        }
+        if (!skipFader.isActive()) {
+            skipFader.set(1);
         }
         long nextStart = SkipUtils.nextAdStart(currentPlayable, position, undoneAdChapterStarts);
         float speed = Math.max(player.getPlaybackParameters().speed, 0.1f);
         long delay = nextStart > position ? (long) ((nextStart - position) / speed) : -1;
-        if (delay >= 0 && delay < 1500) {
-            adSkipHandler.postDelayed(adSkipCheck, delay + 20);
+        long lead = fade ? SKIP_FADE_MS : 0;
+        if (delay < 0 || delay >= 1500 + lead) {
+            return;
+        }
+        if (delay <= lead) {
+            skipFader.fadeOut(delay, () -> adSkipHandler.postDelayed(adSkipCheck, 20));
+        } else {
+            adSkipHandler.postDelayed(adSkipCheck, delay - lead + (fade ? 0 : 20));
         }
     }
 
@@ -1063,9 +1099,11 @@ public class Media3PlaybackService extends MediaLibraryService {
     }
 
     private void applyVolumeAdaption(float baseVolume) {
+        // Remembered so a skip fade can be layered on top of the sleep timer fade
+        this.baseVolume = baseVolume;
         float v = baseVolume * volumeAdaptionFactor;
         if (v > 1) {
-            player.setVolume(1.0f);
+            player.setVolume(skipFadeVolume);
             try {
                 if (loudnessEnhancer != null) {
                     loudnessEnhancer.setEnabled(true);
@@ -1075,7 +1113,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                 Log.d(TAG, e.toString());
             }
         } else {
-            player.setVolume(v);
+            player.setVolume(v * skipFadeVolume);
             try {
                 if (loudnessEnhancer != null) {
                     loudnessEnhancer.setEnabled(false);

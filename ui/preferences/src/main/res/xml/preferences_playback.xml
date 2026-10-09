@@ -57,6 +57,12 @@
                 android:key="prefAdSkipKinds"
                 android:summary="@string/pref_ad_skip_kinds_sum"
                 android:title="@string/pref_ad_skip_kinds_title"/>
+        <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:dependency="prefAdSkipEnabled"
+                android:key="prefAdSkipFade"
+                android:summary="@string/pref_ad_skip_fade_sum"
+                android:title="@string/pref_ad_skip_fade_title"/>
         <EditTextPreference
                 android:dependency="prefAdSkipEnabled"
                 android:key="prefDeepInfraApiKey"

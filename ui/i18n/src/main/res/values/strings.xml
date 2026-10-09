@@ -494,6 +494,8 @@
     <string name="pref_ad_skip_sum">After an episode is downloaded, it is transcribed and ads, intros and outros are marked as chapters using an AI service with your own API key (DeepInfra by default). The full audio is uploaded to that service. The transcript is saved with the episode</string>
     <string name="pref_ad_skip_kinds_title">Automatically skip</string>
     <string name="pref_ad_skip_kinds_sum">Which marked chapters are skipped during playback</string>
+    <string name="pref_ad_skip_fade_title">Fade around skips</string>
+    <string name="pref_ad_skip_fade_sum">Briefly fade the audio out and back in so skips do not sound like abrupt cuts</string>
     <string name="pref_deepinfra_api_key_title">API key</string>
     <string name="pref_deepinfra_api_key_sum">Your API key for the transcription and chat endpoints. Get a DeepInfra key at deepinfra.com</string>
     <string name="pref_ad_skip_transcription_url_title">Transcription endpoint</string>
