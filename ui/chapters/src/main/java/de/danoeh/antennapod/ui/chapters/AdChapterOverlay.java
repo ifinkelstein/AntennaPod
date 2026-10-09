@@ -16,6 +16,7 @@ import java.util.List;
 
 public class AdChapterOverlay {
     static final long SNAP_MS = 1000;
+    static final long MAX_GAP_MS = 12000;
 
     private AdChapterOverlay() {
     }
@@ -59,6 +60,7 @@ public class AdChapterOverlay {
             }
         }
         Collections.sort(ranges, (a, b) -> Long.compare(a.getStartMs(), b.getStartMs()));
+        closeShortGaps(ranges);
 
         List<Chapter> result = new ArrayList<>();
         for (Chapter chapter : base) {
@@ -80,6 +82,21 @@ public class AdChapterOverlay {
         }
         Collections.sort(result, (a, b) -> Long.compare(a.getStart(), b.getStart()));
         return result;
+    }
+
+    /**
+     * A few seconds between two marked sections are almost always the tail of the first ad (the transcript
+     * lines are coarse), not show content, so the break is treated as one block.
+     */
+    static void closeShortGaps(List<AdSegment> ranges) {
+        for (int i = 0; i + 1 < ranges.size(); i++) {
+            AdSegment range = ranges.get(i);
+            long nextStart = ranges.get(i + 1).getStartMs();
+            long gap = nextStart - range.getEndMs();
+            if (gap > 0 && gap <= MAX_GAP_MS) {
+                ranges.set(i, new AdSegment(range.getStartMs(), nextStart, range.getKind(), range.getConfidence()));
+            }
+        }
     }
 
     private static boolean isInsideRange(long time, List<AdSegment> ranges) {
