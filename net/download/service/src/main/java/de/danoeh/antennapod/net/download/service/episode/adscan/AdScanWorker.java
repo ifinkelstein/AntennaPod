@@ -56,7 +56,8 @@ public class AdScanWorker extends Worker {
     private static final String TAG = "AdScanWorker";
     public static final String WORK_TAG = "adScan";
     private static final String WORK_DATA_MEDIA_ID = "media_id";
-    private static final long MAX_DURATION_MS = 3L * 60 * 60 * 1000;
+    // Cost guard: a 6 hour episode costs about 8 cents to transcribe
+    private static final long MAX_DURATION_MS = 6L * 60 * 60 * 1000;
     // With a 5 minute exponential backoff, five attempts span roughly 75 minutes
     private static final int MAX_ATTEMPTS = 5;
     private static final String TRANSCRIPT_CACHE_DIR = "adscan-transcripts";
@@ -239,7 +240,8 @@ public class AdScanWorker extends Worker {
             return Result.success();
         }
         if (media.getDuration() > MAX_DURATION_MS) {
-            Log.w(TAG, "Not scanning " + media.getEpisodeTitle() + ": longer than 3 hours");
+            Log.w(TAG, "Not scanning " + media.getEpisodeTitle() + ": longer than "
+                    + MAX_DURATION_MS / 3_600_000 + " hours");
             finish(mediaId, AdScan.STATE_SKIPPED, downloadDate, Collections.emptyList());
             return Result.success();
         }

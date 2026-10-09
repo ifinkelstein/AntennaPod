@@ -129,7 +129,8 @@ public final class AdScanUi {
      * Whether tapping the status should start a scan rather than show results.
      */
     public static boolean canStart(@Nullable AdScan scan, @Nullable WorkInfo work) {
-        if (scan == null || scan.getState() == AdScan.STATE_FAILED) {
+        // Skipped scans can be retried too: the reason (file, length limit) may no longer apply
+        if (scan == null || scan.getState() == AdScan.STATE_FAILED || scan.getState() == AdScan.STATE_SKIPPED) {
             return true;
         }
         return scan.getState() == AdScan.STATE_PENDING && (work == null || work.getState().isFinished());

@@ -519,7 +519,7 @@
     <string name="ad_scan_status_detecting">Detecting ads: finding ads in the transcript</string>
     <string name="ad_scan_status_retrying">Detecting ads: waiting to retry after an error</string>
     <string name="ad_scan_status_failed">Ad detection failed. Tap to retry</string>
-    <string name="ad_scan_status_skipped">Ad detection is not possible for this file. If it does not play either, delete and download it again</string>
+    <string name="ad_scan_status_skipped">Ad detection was not possible for this file. Tap to try again</string>
     <string name="ad_scan_status_none">No ads found</string>
     <plurals name="ad_scan_status_found">
         <item quantity="one">%1$d section marked, %2$s skipped</item>
