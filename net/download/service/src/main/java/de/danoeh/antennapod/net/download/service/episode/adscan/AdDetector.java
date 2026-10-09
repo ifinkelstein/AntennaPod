@@ -19,6 +19,8 @@ public class AdDetector {
     static final long MIN_SEGMENT_MS = 8000;
     static final long MERGE_GAP_MS = 3000;
     static final float MIN_CONFIDENCE = 0.6f;
+    static final long LEAD_IN_MIN_GAP_MS = 1500;
+    static final long LEAD_IN_MARGIN_MS = 500;
     static final List<String> KNOWN_KINDS = Arrays.asList(AdSegment.KIND_AD, AdSegment.KIND_HOST_READ,
             AdSegment.KIND_PROMO, AdSegment.KIND_INTRO, AdSegment.KIND_OUTRO);
 
@@ -145,7 +147,7 @@ public class AdDetector {
         }
         List<AdSegment> result = new ArrayList<>();
         for (AdSegment segment : merged) {
-            long start = snap(segment.getStartMs(), transcript);
+            long start = includeLeadIn(snap(segment.getStartMs(), transcript), transcript);
             long end = snap(segment.getEndMs(), transcript);
             if (end - start >= MIN_SEGMENT_MS) {
                 result.add(new AdSegment(start, end, segment.getKind(), segment.getConfidence()));
@@ -168,6 +170,24 @@ public class AdDetector {
             }
         }
         return bestDistance <= 2000 ? best : timeMs;
+    }
+
+    /**
+     * Ads often open with a jingle that has no words, so the first transcript line of an ad comes seconds after
+     * it starts. When speech stops well before that line, the section starts shortly after the speech instead.
+     */
+    static long includeLeadIn(long startMs, List<TranscriptSegment> transcript) {
+        long previousSpeechEnd = 0;
+        for (TranscriptSegment line : transcript) {
+            if (line.getStartTime() >= startMs) {
+                break;
+            }
+            previousSpeechEnd = Math.max(previousSpeechEnd, line.getEndTime());
+        }
+        if (startMs - previousSpeechEnd <= LEAD_IN_MIN_GAP_MS) {
+            return startMs;
+        }
+        return previousSpeechEnd == 0 ? 0 : previousSpeechEnd + LEAD_IN_MARGIN_MS;
     }
 
     public static String toPodcastIndexJson(List<TranscriptSegment> transcript) {

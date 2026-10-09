@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class DeepInfraClient {
+    static final long LINE_PAUSE_MS = 1000;
+    static final long MAX_LINE_MS = 12000;
     private final String apiKey;
     private final String transcriptionUrl;
     private final String transcriptionModel;
@@ -73,6 +75,7 @@ public class DeepInfraClient {
                 .addFormDataPart("model", transcriptionModel)
                 .addFormDataPart("response_format", "verbose_json")
                 .addFormDataPart("timestamp_granularities[]", "segment")
+                .addFormDataPart("timestamp_granularities[]", "word")
                 .build();
         Request request = new Request.Builder()
                 .url(parseUrl(transcriptionUrl))
@@ -81,7 +84,13 @@ public class DeepInfraClient {
                 .build();
         String json = execute(request);
         try {
-            JSONArray segments = new JSONObject(json).getJSONArray("segments");
+            JSONObject response = new JSONObject(json);
+            JSONArray words = response.optJSONArray("words");
+            if (words != null && words.length() > 0) {
+                return linesFromWords(words, offsetMs);
+            }
+            // Endpoints without word timestamps: Whisper segments are up to 30 s long, so boundaries are coarse
+            JSONArray segments = response.getJSONArray("segments");
             List<TranscriptSegment> result = new ArrayList<>();
             for (int i = 0; i < segments.length(); i++) {
                 JSONObject segment = segments.getJSONObject(i);
@@ -97,6 +106,47 @@ public class DeepInfraClient {
         } catch (JSONException e) {
             throw new IOException("Unexpected transcription response", e);
         }
+    }
+
+    /**
+     * Groups words into short lines, breaking at sentence ends, pauses and a maximum length, so that
+     * section boundaries can be placed within about a second.
+     */
+    static List<TranscriptSegment> linesFromWords(JSONArray words, long offsetMs) throws JSONException {
+        List<TranscriptSegment> lines = new ArrayList<>();
+        StringBuilder text = new StringBuilder();
+        long lineStart = -1;
+        long lineEnd = -1;
+        for (int i = 0; i < words.length(); i++) {
+            JSONObject word = words.getJSONObject(i);
+            String token = word.optString("word", "").trim();
+            if (token.isEmpty()) {
+                continue;
+            }
+            long start = offsetMs + Math.round(word.getDouble("start") * 1000);
+            long end = offsetMs + Math.round(word.getDouble("end") * 1000);
+            boolean pause = lineEnd >= 0 && start - lineEnd > LINE_PAUSE_MS;
+            boolean tooLong = lineStart >= 0 && end - lineStart > MAX_LINE_MS;
+            if (text.length() > 0 && (pause || tooLong)) {
+                lines.add(new TranscriptSegment(lineStart, lineEnd, text.toString(), ""));
+                text.setLength(0);
+            }
+            if (text.length() == 0) {
+                lineStart = start;
+            } else {
+                text.append(' ');
+            }
+            text.append(token);
+            lineEnd = end;
+            if (token.endsWith(".") || token.endsWith("?") || token.endsWith("!")) {
+                lines.add(new TranscriptSegment(lineStart, lineEnd, text.toString(), ""));
+                text.setLength(0);
+            }
+        }
+        if (text.length() > 0) {
+            lines.add(new TranscriptSegment(lineStart, lineEnd, text.toString(), ""));
+        }
+        return lines;
     }
 
     public String chat(String systemPrompt, String userPrompt) throws IOException {
