@@ -1,6 +1,7 @@
 package de.danoeh.antennapod.ui.screen.episode;
 
 import android.content.Context;
+import android.graphics.drawable.LayerDrawable;
 import android.os.Bundle;
 import android.text.Layout;
 import android.text.TextUtils;
@@ -297,6 +298,10 @@ public class ItemFragment extends Fragment {
         AdScan scan = media.getAdScan();
         viewBinding.adScanStatus.setText(AdScanUi.describe(requireContext(), scan, adScanWork));
         viewBinding.adScanStatus.setCompoundDrawablesRelativeWithIntrinsicBounds(AdScanUi.iconFor(scan), 0, 0, 0);
+        LayerDrawable background = (LayerDrawable) viewBinding.adScanStatus.getBackground().mutate();
+        // A clip drawable's level is its filled fraction out of 10000
+        background.findDrawableByLayerId(R.id.ad_scan_progress)
+                .setLevel(Math.round(AdScanUi.progress(scan, adScanWork) * 10000));
         viewBinding.adScanStatus.setVisibility(View.VISIBLE);
     }
 

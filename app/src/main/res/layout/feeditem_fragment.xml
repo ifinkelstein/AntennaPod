@@ -195,7 +195,7 @@
             android:layout_marginBottom="8dp"
             android:paddingHorizontal="16dp"
             android:paddingVertical="8dp"
-            android:background="@drawable/bg_message_info"
+            android:background="@drawable/bg_ad_scan_status"
             android:drawablePadding="8dp"
             android:gravity="center_vertical"
             android:textColor="?attr/colorAccent"

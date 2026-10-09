@@ -105,6 +105,27 @@ public final class AdScanUi {
     }
 
     /**
+     * How far a running scan has got, from 0 to 1. Transcription is the slow part and fills most of the bar;
+     * a part in progress counts as half done so the bar moves as soon as work starts.
+     */
+    public static float progress(@Nullable AdScan scan, @Nullable WorkInfo work) {
+        if (scan == null || scan.getState() != AdScan.STATE_PENDING
+                || work == null || work.getState() != WorkInfo.State.RUNNING) {
+            return 0;
+        }
+        Data progress = work.getProgress();
+        if (AdScanWorker.STAGE_DETECTING.equals(progress.getString(AdScanWorker.PROGRESS_STAGE))) {
+            return 0.95f;
+        }
+        int parts = progress.getInt(AdScanWorker.PROGRESS_PARTS, 0);
+        if (parts <= 0) {
+            return 0.03f;
+        }
+        int part = progress.getInt(AdScanWorker.PROGRESS_PART, 1);
+        return 0.9f * (part - 0.5f) / parts;
+    }
+
+    /**
      * Whether tapping the status should start a scan rather than show results.
      */
     public static boolean canStart(@Nullable AdScan scan, @Nullable WorkInfo work) {

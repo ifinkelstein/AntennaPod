@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Info box whose fill doubles as a progress bar while ads are being detected (set the progress layer's level) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+            xmlns:aapt="http://schemas.android.com/aapt">
+    <item android:drawable="@drawable/bg_message_info" />
+    <item android:id="@+id/ad_scan_progress">
+        <clip
+            android:clipOrientation="horizontal"
+            android:gravity="start">
+            <shape>
+                <corners android:radius="8dp" />
+                <solid>
+                    <aapt:attr name="android:color">
+                        <selector>
+                            <item android:alpha="0.3" android:color="?attr/colorPrimary" />
+                        </selector>
+                    </aapt:attr>
+                </solid>
+            </shape>
+        </clip>
+    </item>
+</layer-list>
