@@ -117,7 +117,7 @@ public class AudioChunker {
 
     private static byte[] adtsHeader(int frameLength, int sampleRate, int channels) {
         int freqIndex = sampleRateIndex(sampleRate);
-        int fullLength = frameLength + 7;
+        final int fullLength = frameLength + 7;
         byte[] header = new byte[7];
         header[0] = (byte) 0xFF;
         header[1] = (byte) 0xF9;

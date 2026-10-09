@@ -103,7 +103,8 @@ public abstract class UserPreferences {
     public static final String DEFAULT_AD_SKIP_TRANSCRIPTION_URL = "https://api.deepinfra.com/v1/audio/transcriptions";
     public static final String DEFAULT_AD_SKIP_TRANSCRIPTION_MODEL = "openai/whisper-large-v3-turbo";
     public static final String DEFAULT_AD_SKIP_CHAT_URL = "https://api.deepinfra.com/v1/openai/chat/completions";
-    public static final String DEFAULT_AD_SKIP_CHAT_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct";
+    public static final String DEFAULT_AD_SKIP_CHAT_MODEL = "google/gemma-4-26B-A4B-it";
+    private static final String LEGACY_AD_SKIP_CHAT_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct";
 
     // Network
     private static final String PREF_ENQUEUE_DOWNLOADED = "prefEnqueueDownloaded";
@@ -464,7 +465,9 @@ public abstract class UserPreferences {
     }
 
     public static String getAdSkipChatModel() {
-        return getNonEmptyString(PREF_AD_SKIP_CHAT_MODEL, DEFAULT_AD_SKIP_CHAT_MODEL);
+        String model = getNonEmptyString(PREF_AD_SKIP_CHAT_MODEL, DEFAULT_AD_SKIP_CHAT_MODEL);
+        // The settings dialog pre-fills the default, so the retired default may have been saved explicitly
+        return LEGACY_AD_SKIP_CHAT_MODEL.equals(model) ? DEFAULT_AD_SKIP_CHAT_MODEL : model;
     }
 
     public static Set<String> getAdSkipKinds() {

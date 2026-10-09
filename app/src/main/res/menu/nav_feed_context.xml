@@ -27,6 +27,12 @@
         android:title="@string/share_label" />
 
     <item
+        android:id="@+id/detect_ads_feed_item"
+        android:menuCategory="container"
+        android:title="@string/detect_ads_feed_label"
+        android:visible="false" />
+
+    <item
         android:id="@+id/multi_select"
         android:menuCategory="container"
         android:title="@string/multi_select"

@@ -7,6 +7,8 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.model.feed.Feed;
+import de.danoeh.antennapod.net.download.service.episode.adscan.AdScanWorker;
+import de.danoeh.antennapod.ui.episodeslist.AdScanActions;
 import de.danoeh.antennapod.ui.screen.feed.RemoveFeedDialog;
 import de.danoeh.antennapod.ui.screen.feed.RenameFeedDialog;
 import de.danoeh.antennapod.ui.screen.feed.preferences.TagSettingsDialog;
@@ -38,6 +40,7 @@ public abstract class FeedMenuHandler {
         setItemVisibility(menu, R.id.remove_restore_feed, allArchived);
         boolean singleNonLocalFeedSelected = selectedItems.size() == 1 && !selectedItems.get(0).isLocalFeed();
         setItemVisibility(menu, R.id.share_feed, singleNonLocalFeedSelected);
+        setItemVisibility(menu, R.id.detect_ads_feed_item, selectedItems.size() == 1 && AdScanWorker.isEnabled());
         return true;
     }
 
@@ -64,6 +67,8 @@ public abstract class FeedMenuHandler {
                     .show(fragment.getChildFragmentManager(), null);
         } else if (menuItemId == R.id.share_feed) {
             ShareUtils.shareFeedLink(context, selectedFeed);
+        } else if (menuItemId == R.id.detect_ads_feed_item) {
+            AdScanActions.scanFeed(context, selectedFeed);
         } else {
             return false;
         }

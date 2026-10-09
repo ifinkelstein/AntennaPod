@@ -495,13 +495,33 @@ public final class DBReader {
             if (!cursor.moveToFirst()) {
                 return null;
             }
-            int state = cursor.getInt(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_STATE));
-            long downloadDate = cursor.getLong(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_DOWNLOAD_DATE));
-            String json = cursor.getString(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_AD_SCAN_SEGMENTS));
-            return new AdScan(mediaId, state, downloadDate, AdSegment.fromJson(json));
+            return extractAdScan(cursor);
         } finally {
             adapter.close();
         }
+    }
+
+    @NonNull
+    public static List<AdScan> getAdScansByState(int... states) {
+        PodDBAdapter adapter = PodDBAdapter.getInstance();
+        adapter.open();
+        try (Cursor cursor = adapter.getAdScansCursorByState(states)) {
+            List<AdScan> result = new ArrayList<>(cursor.getCount());
+            while (cursor.moveToNext()) {
+                result.add(extractAdScan(cursor));
+            }
+            return result;
+        } finally {
+            adapter.close();
+        }
+    }
+
+    private static AdScan extractAdScan(Cursor cursor) {
+        long mediaId = cursor.getLong(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_MEDIA));
+        int state = cursor.getInt(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_STATE));
+        long downloadDate = cursor.getLong(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_DOWNLOAD_DATE));
+        String json = cursor.getString(cursor.getColumnIndexOrThrow(PodDBAdapter.KEY_AD_SCAN_SEGMENTS));
+        return new AdScan(mediaId, state, downloadDate, AdSegment.fromJson(json));
     }
 
     /**

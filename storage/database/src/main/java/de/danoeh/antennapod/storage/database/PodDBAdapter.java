@@ -1065,6 +1065,14 @@ public class PodDBAdapter {
                 new String[]{String.valueOf(mediaId)}, null, null, null);
     }
 
+    public final Cursor getAdScansCursorByState(final int... states) {
+        StringBuilder in = new StringBuilder();
+        for (int state : states) {
+            in.append(in.length() == 0 ? "" : ",").append(state);
+        }
+        return db.query(TABLE_NAME_AD_SCANS, null, KEY_STATE + " IN (" + in + ")", null, null, null, null);
+    }
+
     public void setAdScan(long mediaId, int state, long downloadDate, String segmentsJson) {
         ContentValues values = new ContentValues();
         values.put(KEY_MEDIA, mediaId);

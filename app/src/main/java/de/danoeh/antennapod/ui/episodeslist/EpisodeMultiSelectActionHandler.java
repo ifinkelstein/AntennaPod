@@ -62,6 +62,8 @@ public class EpisodeMultiSelectActionHandler {
             resetPositionChecked(items);
         } else if (actionId == R.id.share_item) {
             shareChecked(items);
+        } else if (actionId == R.id.detect_ads_item) {
+            AdScanActions.scanEpisodes(activity, items);
         } else if (actionId == R.id.move_to_top_item) {
             moveToTopChecked(items);
         } else if (actionId == R.id.move_to_bottom_item) {

@@ -55,8 +55,13 @@ public class DeepInfraClient {
             return code == 401 || code == 403;
         }
 
+        /** Out of credit (DeepInfra answers 402). Every scan fails until the account is topped up. */
+        public boolean isPaymentError() {
+            return code == 402;
+        }
+
         public boolean isRetryable() {
-            return code == 429 || code >= 500;
+            return code == 408 || code == 429 || code >= 500;
         }
     }
 

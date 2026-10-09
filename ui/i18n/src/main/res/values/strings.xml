@@ -501,6 +501,14 @@
     <string name="pref_ad_skip_chat_url_title">Chat endpoint</string>
     <string name="pref_ad_skip_chat_model_title">Detection model</string>
     <string name="ad_skip_key_invalid">Ad skipping paused: check your API key</string>
+    <string name="ad_skip_payment_required">Ad skipping paused: your AI service account is out of credit</string>
+    <string name="detect_ads_label">Detect ads</string>
+    <string name="detect_ads_feed_label">Detect ads in downloaded episodes</string>
+    <string name="detect_ads_nothing_to_scan">All downloaded episodes are already scanned</string>
+    <plurals name="detect_ads_queued_message">
+        <item quantity="one">Scanning %d episode for ads</item>
+        <item quantity="other">Scanning %d episodes for ads</item>
+    </plurals>
     <string name="ad_skip_kind_ad">Ads</string>
     <string name="ad_skip_kind_host_read">Sponsor reads</string>
     <string name="ad_skip_kind_promo">Show promos</string>

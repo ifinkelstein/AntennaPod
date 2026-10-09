@@ -1,6 +1,8 @@
 package de.danoeh.antennapod.ui.screen.preferences;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
@@ -11,17 +13,26 @@ import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.net.download.service.episode.adscan.AdScanWorker;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
 import de.danoeh.antennapod.ui.preferences.screen.AnimatedPreferenceFragment;
 import de.danoeh.antennapod.ui.screen.feed.preferences.SkipPreferenceDialog;
 import de.danoeh.antennapod.ui.screen.playback.VariableSpeedDialog;
 
+import io.reactivex.rxjava3.schedulers.Schedulers;
+
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 public class PlaybackPreferencesFragment extends AnimatedPreferenceFragment {
     private static final String PREF_PLAYBACK_SPEED_LAUNCHER = "prefPlaybackSpeedLauncher";
     private static final String PREF_PLAYBACK_REWIND_DELTA_LAUNCHER = "prefPlaybackRewindDeltaLauncher";
     private static final String PREF_PLAYBACK_FAST_FORWARD_DELTA_LAUNCHER = "prefPlaybackFastForwardDeltaLauncher";
+    private static final List<String> AD_SKIP_SETTINGS = Arrays.asList(UserPreferences.PREF_AD_SKIP_ENABLED,
+            UserPreferences.PREF_DEEPINFRA_API_KEY, UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_URL,
+            UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_MODEL, UserPreferences.PREF_AD_SKIP_CHAT_URL,
+            UserPreferences.PREF_AD_SKIP_CHAT_MODEL);
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -44,7 +55,32 @@ public class PlaybackPreferencesFragment extends AnimatedPreferenceFragment {
                 UserPreferences.DEFAULT_AD_SKIP_CHAT_URL);
         setupAdSkipTextPreference(UserPreferences.PREF_AD_SKIP_CHAT_MODEL,
                 UserPreferences.DEFAULT_AD_SKIP_CHAT_MODEL);
+        // Show the model that is actually used, which differs from the stored text for the retired default
+        findPreference(UserPreferences.PREF_AD_SKIP_CHAT_MODEL)
+                .setSummaryProvider(p -> UserPreferences.getAdSkipChatModel());
     }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        getPreferenceManager().getSharedPreferences()
+                .registerOnSharedPreferenceChangeListener(adSkipSettingsListener);
+    }
+
+    @Override
+    public void onPause() {
+        getPreferenceManager().getSharedPreferences()
+                .unregisterOnSharedPreferenceChangeListener(adSkipSettingsListener);
+        super.onPause();
+    }
+
+    private final SharedPreferences.OnSharedPreferenceChangeListener adSkipSettingsListener = (prefs, key) -> {
+        if (AD_SKIP_SETTINGS.contains(key)) {
+            // Scans paused by a bad key, missing credit or a wrong endpoint get another chance
+            Context context = requireContext().getApplicationContext();
+            Schedulers.io().scheduleDirect(() -> AdScanWorker.resumeUnfinished(context));
+        }
+    };
 
     private void setupAdSkipTextPreference(String key, String defaultValue) {
         EditTextPreference preference = findPreference(key);

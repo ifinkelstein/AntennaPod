@@ -130,6 +130,7 @@ public class FeedItemMenuHandler {
         setItemVisibility(menu, R.id.remove_item, canDelete);
         setItemVisibility(menu, R.id.download_item, canDownload);
         setItemVisibility(menu, R.id.transcript_item, canShowTranscript);
+        setItemVisibility(menu, R.id.detect_ads_item, AdScanActions.canScanAny(selectedItems));
 
         if (selectedItems.size() == 1 && selectedItems.get(0).getFeed().getState() == Feed.STATE_NOT_SUBSCRIBED) {
             setItemVisibility(menu, R.id.mark_read_item, false);
@@ -226,6 +227,8 @@ public class FeedItemMenuHandler {
                             IntentUtils.openInBrowser(context, selectedItem.getSocialInteractUrl()))
                     .setNegativeButton(R.string.cancel_label, null)
                     .show();
+        } else if (menuItemId == R.id.detect_ads_item) {
+            AdScanActions.scanEpisodes(context, Collections.singletonList(selectedItem));
         } else if (menuItemId == R.id.share_item) {
             ShareDialog shareDialog = ShareDialog.newInstance(selectedItem);
             shareDialog.show((fragment.getActivity().getSupportFragmentManager()), "ShareEpisodeDialog");
