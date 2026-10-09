@@ -45,6 +45,8 @@ public class AdDetector {
             + "introduces the episode's topic or guest. "
             + "Use the timestamp of the first line of the ad as start and the timestamp of the first line after "
             + "the ad as end. Include the whole ad break when several ads are back to back. "
+            + "When the host announces the break, for example \"let's take a quick break\" or \"a word from our "
+            + "sponsors\", start at that announcement. "
             + "Do not include the show's own content, interviews, or mentions of products in normal conversation. "
             + "If there are no ads return {\"segments\":[]}.";
 
