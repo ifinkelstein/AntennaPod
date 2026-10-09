@@ -106,12 +106,32 @@ public final class SkipUtils {
         EventBus.getDefault().post(new MessageEvent(
                 context.getResources().getQuantityString(R.plurals.ad_skipped_snackbar, skippedSeconds, skippedSeconds),
                 ctx -> {
-                    if (undoHandler.undo(position)) {
-                        ignoredChapterStarts.add(chapterStart);
+                    // Ignore first: seeking back into the section triggers an immediate skip check
+                    ignoredChapterStarts.add(chapterStart);
+                    if (!undoHandler.undo(position)) {
+                        ignoredChapterStarts.remove(chapterStart);
                     }
                 },
                 context.getString(R.string.undo)));
         return target;
+    }
+
+    /**
+     * Start of the next section after the position that would be skipped, or -1.
+     */
+    public static long nextAdStart(FeedMedia media, long position, Set<Long> ignoredChapterStarts) {
+        List<Chapter> chapters = media.getChapters();
+        if (!UserPreferences.isAdSkipEnabled() || chapters == null) {
+            return -1;
+        }
+        Set<String> kinds = UserPreferences.getAdSkipKinds();
+        for (Chapter chapter : chapters) {
+            if (chapter.getStart() > position && isSkipped(chapter, kinds)
+                    && !ignoredChapterStarts.contains(chapter.getStart())) {
+                return chapter.getStart();
+            }
+        }
+        return -1;
     }
 
     private static boolean isSkipped(Chapter chapter, Set<String> kinds) {

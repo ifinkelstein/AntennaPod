@@ -3,6 +3,8 @@ package de.danoeh.antennapod.playback.service;
 import android.content.Intent;
 import android.media.audiofx.LoudnessEnhancer;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.webkit.URLUtil;
@@ -92,6 +94,8 @@ public class Media3PlaybackService extends MediaLibraryService {
     private MediaLibrarySession mediaSession;
     private FeedMedia currentPlayable;
     private final Set<Long> undoneAdChapterStarts = new HashSet<>();
+    private final Handler adSkipHandler = new Handler(Looper.getMainLooper());
+    private final Runnable adSkipCheck = this::checkAdSkip;
     private String pendingStreamMediaId;
     private boolean allowStreamingThisTime = false;
     private Disposable mediaLoaderDisposable;
@@ -372,6 +376,9 @@ public class Media3PlaybackService extends MediaLibraryService {
                     || playbackState == Player.STATE_ENDED) {
                 saveCurrentPosition();
             }
+            if (playbackState == Player.STATE_READY) {
+                scheduleAdSkipCheck();
+            }
             if (playbackState == Player.STATE_ENDED && currentPlayable != null) {
                 handlePlaybackEnded();
             }
@@ -388,6 +395,7 @@ public class Media3PlaybackService extends MediaLibraryService {
             }
             checkpointPlayedDuration((int) oldPosition.positionMs);
             playedDurationCountedUntil = (int) newPosition.positionMs;
+            scheduleAdSkipCheck();
         }
 
         @Override
@@ -406,7 +414,9 @@ public class Media3PlaybackService extends MediaLibraryService {
             if (PlaybackService.isRunning) {
                 lastPositionSaveTime = System.currentTimeMillis();
                 setupPositionObserver();
+                scheduleAdSkipCheck();
             } else {
+                adSkipHandler.removeCallbacks(adSkipCheck);
                 cancelPositionObserver();
                 saveCurrentPosition();
                 if (currentPlayable != null) {
@@ -476,6 +486,7 @@ public class Media3PlaybackService extends MediaLibraryService {
     public void onDestroy() {
         PlaybackService.isRunning = false;
         cancelPositionObserver();
+        adSkipHandler.removeCallbacks(adSkipCheck);
         if (sleepTimer != null) {
             sleepTimer.stop();
             sleepTimer = null;
@@ -537,24 +548,50 @@ public class Media3PlaybackService extends MediaLibraryService {
                                     player.seekTo(player.getDuration());
                                     return;
                                 }
-                                if (!player.isPlaying()) {
-                                    return;
-                                }
-                                final long skippedMediaId = currentPlayable.getId();
-                                long adSkipTarget = SkipUtils.skipAdIfNecessary(this, currentPlayable, position,
-                                        duration, undoneAdChapterStarts, target -> {
-                                            if (player == null || currentPlayable == null
-                                                    || currentPlayable.getId() != skippedMediaId) {
-                                                return false;
-                                            }
-                                            player.seekTo(target);
-                                            return true;
-                                        });
-                                if (adSkipTarget >= 0) {
-                                    player.seekTo(adSkipTarget);
-                                }
+                                checkAdSkip();
                             }
                         }, error -> Log.e(TAG, "Position observer error", error));
+    }
+
+    /**
+     * Skips a marked section at the current position. The position observer only ticks once per second,
+     * so this also runs right when playback starts or seeks, and is scheduled for the exact start of the
+     * next section. Otherwise up to a second of each ad would be heard.
+     */
+    private void checkAdSkip() {
+        adSkipHandler.removeCallbacks(adSkipCheck);
+        if (currentPlayable == null || player == null || !player.getPlayWhenReady()) {
+            return;
+        }
+        long position = player.getCurrentPosition();
+        long duration = player.getDuration();
+        if (duration <= 0) {
+            return;
+        }
+        final long skippedMediaId = currentPlayable.getId();
+        long adSkipTarget = SkipUtils.skipAdIfNecessary(this, currentPlayable, position,
+                duration, undoneAdChapterStarts, target -> {
+                    if (player == null || currentPlayable == null || currentPlayable.getId() != skippedMediaId) {
+                        return false;
+                    }
+                    player.seekTo(target);
+                    return true;
+                });
+        if (adSkipTarget >= 0) {
+            player.seekTo(adSkipTarget);
+            return;
+        }
+        long nextStart = SkipUtils.nextAdStart(currentPlayable, position, undoneAdChapterStarts);
+        float speed = Math.max(player.getPlaybackParameters().speed, 0.1f);
+        long delay = nextStart > position ? (long) ((nextStart - position) / speed) : -1;
+        if (delay >= 0 && delay < 1500) {
+            adSkipHandler.postDelayed(adSkipCheck, delay + 20);
+        }
+    }
+
+    private void scheduleAdSkipCheck() {
+        adSkipHandler.removeCallbacks(adSkipCheck);
+        adSkipHandler.post(adSkipCheck);
     }
 
     private void cancelPositionObserver() {
@@ -599,6 +636,7 @@ public class Media3PlaybackService extends MediaLibraryService {
                                 DBWriter.addQueueItem(this, media.getItem());
                             }
                             switchToPlayable(media);
+                            scheduleAdSkipCheck();
                         },
                                 error -> Log.e(TAG, "Failed to load current media", error));
 
@@ -980,7 +1018,10 @@ public class Media3PlaybackService extends MediaLibraryService {
             return;
         }
         final FeedMedia media = currentPlayable;
-        Schedulers.io().scheduleDirect(() -> ChapterUtils.loadChapters(media, this, true));
+        Schedulers.io().scheduleDirect(() -> {
+            ChapterUtils.loadChapters(media, this, true);
+            scheduleAdSkipCheck();
+        });
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
