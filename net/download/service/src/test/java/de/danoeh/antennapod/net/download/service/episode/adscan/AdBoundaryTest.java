@@ -41,6 +41,20 @@ public class AdBoundaryTest {
     }
 
     @Test
+    public void wordPiecesWithoutLeadingSpaceStayAttached() throws Exception {
+        JSONArray words = new JSONArray()
+                .put(new JSONObject().put("word", " Visit").put("start", 0.0).put("end", 0.3))
+                .put(new JSONObject().put("word", " Monarch").put("start", 0.3).put("end", 0.7))
+                .put(new JSONObject().put("word", ".com").put("start", 0.7).put("end", 0.9))
+                .put(new JSONObject().put("word", " for").put("start", 0.9).put("end", 1.0))
+                .put(new JSONObject().put("word", " 50").put("start", 1.0).put("end", 1.2))
+                .put(new JSONObject().put("word", "%").put("start", 1.2).put("end", 1.3))
+                .put(new JSONObject().put("word", " off.").put("start", 1.3).put("end", 1.5));
+        List<TranscriptSegment> lines = DeepInfraClient.linesFromWords(words, 0);
+        assertEquals("Visit Monarch.com for 50% off.", lines.get(0).getWords());
+    }
+
+    @Test
     public void longLinesAreSplit() throws Exception {
         JSONArray words = new JSONArray();
         for (int i = 0; i < 30; i++) {

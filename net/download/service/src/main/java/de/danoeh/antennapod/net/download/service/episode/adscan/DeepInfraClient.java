@@ -119,7 +119,9 @@ public class DeepInfraClient {
         long lineEnd = -1;
         for (int i = 0; i < words.length(); i++) {
             JSONObject word = words.getJSONObject(i);
-            String token = word.optString("word", "").trim();
+            // Whisper words carry their own leading space; pieces like ".com" or "%" have none and must stay attached
+            String raw = word.optString("word", "");
+            String token = raw.trim();
             if (token.isEmpty()) {
                 continue;
             }
@@ -133,10 +135,10 @@ public class DeepInfraClient {
             }
             if (text.length() == 0) {
                 lineStart = start;
+                text.append(token);
             } else {
-                text.append(' ');
+                text.append(raw.startsWith(" ") ? " " + token : token);
             }
-            text.append(token);
             lineEnd = end;
             if (token.endsWith(".") || token.endsWith("?") || token.endsWith("!")) {
                 lines.add(new TranscriptSegment(lineStart, lineEnd, text.toString(), ""));
