@@ -498,6 +498,10 @@
     <string name="pref_ad_skip_fade_sum">Briefly fade the audio out and back in so skips do not sound like abrupt cuts</string>
     <string name="pref_deepinfra_api_key_title">API key</string>
     <string name="pref_deepinfra_api_key_sum">Your API key for the transcription and chat endpoints. Get a DeepInfra key at deepinfra.com</string>
+    <string name="pref_deepinfra_api_key_saved">Saved (stored encrypted on this device)</string>
+    <string name="pref_deepinfra_api_key_not_set">Not set</string>
+    <string name="pref_deepinfra_api_key_store_failed">Could not store the API key securely on this device</string>
+    <string name="pref_ad_skip_https_required">The endpoint must start with https:// so the API key is not sent unencrypted</string>
     <string name="pref_ad_skip_transcription_url_title">Transcription endpoint</string>
     <string name="pref_ad_skip_transcription_model_title">Transcription model</string>
     <string name="pref_ad_skip_chat_url_title">Chat endpoint</string>

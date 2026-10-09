@@ -155,6 +155,8 @@ public abstract class UserPreferences {
 
     private static Context context;
     private static SharedPreferences prefs;
+    private static SecretStore secrets;
+    private static volatile String deepInfraApiKey;
 
     /**
      * Sets up the UserPreferences class.
@@ -166,8 +168,23 @@ public abstract class UserPreferences {
 
         UserPreferences.context = context.getApplicationContext();
         UserPreferences.prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        UserPreferences.secrets = new SecretStore(UserPreferences.context);
+        migrateApiKeyToSecretStore();
 
         createNoMediaFile();
+    }
+
+    /**
+     * Earlier versions kept the API key in plain text in the normal preferences file.
+     */
+    private static void migrateApiKeyToSecretStore() {
+        String plain = prefs.getString(PREF_DEEPINFRA_API_KEY, null);
+        if (plain == null) {
+            return;
+        }
+        if (plain.trim().isEmpty() || secrets.set(PREF_DEEPINFRA_API_KEY, plain.trim())) {
+            prefs.edit().remove(PREF_DEEPINFRA_API_KEY).apply();
+        }
     }
 
     public enum ThemePreference {
@@ -450,7 +467,32 @@ public abstract class UserPreferences {
     }
 
     public static String getDeepInfraApiKey() {
-        return prefs.getString(PREF_DEEPINFRA_API_KEY, "").trim();
+        String key = deepInfraApiKey;
+        if (key == null) {
+            // Decrypted once and cached: this is checked for every episode row
+            key = secrets != null ? secrets.get(PREF_DEEPINFRA_API_KEY) : "";
+            deepInfraApiKey = key;
+        }
+        return key;
+    }
+
+    /**
+     * Stores the API key encrypted; an empty key removes it. Returns false if it could not be stored.
+     */
+    public static boolean setDeepInfraApiKey(String key) {
+        String trimmed = key == null ? "" : key.trim();
+        if (!secrets.set(PREF_DEEPINFRA_API_KEY, trimmed)) {
+            return false;
+        }
+        deepInfraApiKey = trimmed;
+        return true;
+    }
+
+    /**
+     * Whether a URL may carry the API key: only over https, so it is never sent unencrypted.
+     */
+    public static boolean isSecureEndpoint(String url) {
+        return url == null || url.trim().isEmpty() || url.trim().toLowerCase(Locale.ROOT).startsWith("https://");
     }
 
     public static String getAdSkipTranscriptionUrl() {

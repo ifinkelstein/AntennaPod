@@ -4,7 +4,9 @@ import androidx.annotation.NonNull;
 
 import de.danoeh.antennapod.model.feed.TranscriptSegment;
 import de.danoeh.antennapod.net.common.AntennapodHttpClient;
+import de.danoeh.antennapod.net.common.BasicAuthorizationInterceptor;
 import okhttp3.HttpUrl;
+import okhttp3.Interceptor;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
@@ -18,6 +20,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -38,11 +41,21 @@ public class DeepInfraClient {
         this.transcriptionModel = transcriptionModel;
         this.chatUrl = chatUrl;
         this.chatModel = chatModel;
-        this.client = AntennapodHttpClient.newBuilder()
+        OkHttpClient.Builder builder = AntennapodHttpClient.newBuilder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(10, TimeUnit.MINUTES)
                 .writeTimeout(10, TimeUnit.MINUTES)
-                .build();
+                // The API key must only reach the configured host: no redirects, and no interceptor that
+                // re-sends the Authorization header to a redirect target after a 401
+                .followRedirects(false)
+                .followSslRedirects(false);
+        Iterator<Interceptor> interceptors = builder.interceptors().iterator();
+        while (interceptors.hasNext()) {
+            if (interceptors.next() instanceof BasicAuthorizationInterceptor) {
+                interceptors.remove();
+            }
+        }
+        this.client = builder.build();
     }
 
     public static class ApiException extends IOException {
@@ -183,6 +196,10 @@ public class DeepInfraClient {
         HttpUrl parsed = HttpUrl.parse(url);
         if (parsed == null) {
             throw new ApiException(400, "Invalid endpoint URL: " + url);
+        }
+        if (!parsed.isHttps()) {
+            // Never send the API key unencrypted
+            throw new ApiException(400, "Endpoint must use https: " + url);
         }
         return parsed;
     }

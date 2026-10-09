@@ -7,11 +7,15 @@ import android.content.res.Resources;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
+import android.view.View;
+import android.widget.EditText;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.collection.ArrayMap;
 import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.net.download.service.episode.adscan.AdScanWorker;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
@@ -30,7 +34,7 @@ public class PlaybackPreferencesFragment extends AnimatedPreferenceFragment {
     private static final String PREF_PLAYBACK_REWIND_DELTA_LAUNCHER = "prefPlaybackRewindDeltaLauncher";
     private static final String PREF_PLAYBACK_FAST_FORWARD_DELTA_LAUNCHER = "prefPlaybackFastForwardDeltaLauncher";
     private static final List<String> AD_SKIP_SETTINGS = Arrays.asList(UserPreferences.PREF_AD_SKIP_ENABLED,
-            UserPreferences.PREF_DEEPINFRA_API_KEY, UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_URL,
+            UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_URL,
             UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_MODEL, UserPreferences.PREF_AD_SKIP_CHAT_URL,
             UserPreferences.PREF_AD_SKIP_CHAT_MODEL);
 
@@ -44,15 +48,20 @@ public class PlaybackPreferencesFragment extends AnimatedPreferenceFragment {
     }
 
     private void setupAdSkipPreferences() {
-        EditTextPreference apiKey = findPreference(UserPreferences.PREF_DEEPINFRA_API_KEY);
-        apiKey.setOnBindEditTextListener(editText -> editText.setInputType(
-                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD));
+        Preference apiKey = findPreference(UserPreferences.PREF_DEEPINFRA_API_KEY);
+        updateApiKeySummary(apiKey);
+        apiKey.setOnPreferenceClickListener(p -> {
+            showApiKeyDialog(p);
+            return true;
+        });
         setupAdSkipTextPreference(UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_URL,
                 UserPreferences.DEFAULT_AD_SKIP_TRANSCRIPTION_URL);
+        requireHttps(UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_URL);
         setupAdSkipTextPreference(UserPreferences.PREF_AD_SKIP_TRANSCRIPTION_MODEL,
                 UserPreferences.DEFAULT_AD_SKIP_TRANSCRIPTION_MODEL);
         setupAdSkipTextPreference(UserPreferences.PREF_AD_SKIP_CHAT_URL,
                 UserPreferences.DEFAULT_AD_SKIP_CHAT_URL);
+        requireHttps(UserPreferences.PREF_AD_SKIP_CHAT_URL);
         setupAdSkipTextPreference(UserPreferences.PREF_AD_SKIP_CHAT_MODEL,
                 UserPreferences.DEFAULT_AD_SKIP_CHAT_MODEL);
         // Show the model that is actually used, which differs from the stored text for the retired default
@@ -76,11 +85,54 @@ public class PlaybackPreferencesFragment extends AnimatedPreferenceFragment {
 
     private final SharedPreferences.OnSharedPreferenceChangeListener adSkipSettingsListener = (prefs, key) -> {
         if (AD_SKIP_SETTINGS.contains(key)) {
-            // Scans paused by a bad key, missing credit or a wrong endpoint get another chance
-            Context context = requireContext().getApplicationContext();
-            Schedulers.io().scheduleDirect(() -> AdScanWorker.resumeUnfinished(context));
+            resumeScans();
         }
     };
+
+    /**
+     * The key is masked by default; the eye icon reveals it so a paste can be checked.
+     */
+    private void showApiKeyDialog(Preference preference) {
+        View content = getLayoutInflater().inflate(R.layout.dialog_api_key, null);
+        EditText input = content.findViewById(R.id.apiKeyInput);
+        input.setText(UserPreferences.getDeepInfraApiKey());
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.pref_deepinfra_api_key_title)
+                .setView(content)
+                .setPositiveButton(R.string.confirm_label, (dialog, which) -> {
+                    if (!UserPreferences.setDeepInfraApiKey(input.getText().toString())) {
+                        Toast.makeText(requireContext(), R.string.pref_deepinfra_api_key_store_failed,
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    updateApiKeySummary(preference);
+                    resumeScans();
+                })
+                .setNegativeButton(R.string.cancel_label, null)
+                .show();
+    }
+
+    private void updateApiKeySummary(Preference preference) {
+        // Never shows the key itself, only whether one is stored
+        preference.setSummary(UserPreferences.getDeepInfraApiKey().isEmpty()
+                ? R.string.pref_deepinfra_api_key_not_set : R.string.pref_deepinfra_api_key_saved);
+    }
+
+    private void requireHttps(String key) {
+        findPreference(key).setOnPreferenceChangeListener((p, newValue) -> {
+            if (UserPreferences.isSecureEndpoint((String) newValue)) {
+                return true;
+            }
+            Toast.makeText(requireContext(), R.string.pref_ad_skip_https_required, Toast.LENGTH_LONG).show();
+            return false;
+        });
+    }
+
+    private void resumeScans() {
+        // Scans paused by a bad key, missing credit or a wrong endpoint get another chance
+        Context context = requireContext().getApplicationContext();
+        Schedulers.io().scheduleDirect(() -> AdScanWorker.resumeUnfinished(context));
+    }
 
     private void setupAdSkipTextPreference(String key, String defaultValue) {
         EditTextPreference preference = findPreference(key);

@@ -63,10 +63,11 @@
                 android:key="prefAdSkipFade"
                 android:summary="@string/pref_ad_skip_fade_sum"
                 android:title="@string/pref_ad_skip_fade_title"/>
-        <EditTextPreference
+        <!-- Not persisted here: the key is stored encrypted, see UserPreferences.setDeepInfraApiKey -->
+        <Preference
                 android:dependency="prefAdSkipEnabled"
                 android:key="prefDeepInfraApiKey"
-                android:summary="@string/pref_deepinfra_api_key_sum"
+                android:persistent="false"
                 android:title="@string/pref_deepinfra_api_key_title"
                 search:ignore="true" />
         <EditTextPreference
