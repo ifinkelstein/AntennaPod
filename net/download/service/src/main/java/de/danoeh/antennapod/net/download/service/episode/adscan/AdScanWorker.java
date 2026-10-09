@@ -18,14 +18,10 @@ import androidx.work.ExistingWorkPolicy;
 import androidx.work.ForegroundInfo;
 import androidx.work.NetworkType;
 import androidx.work.OneTimeWorkRequest;
-import androidx.work.OutOfQuotaPolicy;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
-
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
 
 import de.danoeh.antennapod.event.AdScanCompletedEvent;
 import de.danoeh.antennapod.event.MessageEvent;
@@ -149,22 +145,27 @@ public class AdScanWorker extends Worker {
         } catch (Exception e) {
             Log.e(TAG, "Could not store pending scan", e);
         }
-        Constraints.Builder constraints = new Constraints.Builder().setRequiresBatteryNotLow(true);
-        if (UserPreferences.isAllowMobileEpisodeDownload()) {
-            constraints.setRequiredNetworkType(NetworkType.CONNECTED);
-        } else {
-            constraints.setRequiredNetworkType(NetworkType.UNMETERED);
-        }
-        OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(AdScanWorker.class)
-                .addTag(WORK_TAG)
-                .setConstraints(constraints.build())
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5, TimeUnit.MINUTES)
-                .setInputData(new Data.Builder().putLong(WORK_DATA_MEDIA_ID, media.getId()).build())
-                .build();
+        OneTimeWorkRequest request = buildRequest(media.getId(), UserPreferences.isAllowMobileEpisodeDownload());
         // KEEP: a scan that is already queued or running continues instead of being started twice
         WorkManager.getInstance(context).enqueueUniqueWork(uniqueWorkName(media.getId()),
                 ExistingWorkPolicy.KEEP, request);
+    }
+
+    /**
+     * Not expedited: expedited work cannot require battery-not-low, and WorkManager throws when building it.
+     * Long requests are protected by running in the foreground instead, see {@link #tryRunInForeground}.
+     */
+    static OneTimeWorkRequest buildRequest(long mediaId, boolean allowMobileData) {
+        Constraints constraints = new Constraints.Builder()
+                .setRequiresBatteryNotLow(true)
+                .setRequiredNetworkType(allowMobileData ? NetworkType.CONNECTED : NetworkType.UNMETERED)
+                .build();
+        return new OneTimeWorkRequest.Builder(AdScanWorker.class)
+                .addTag(WORK_TAG)
+                .setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5, TimeUnit.MINUTES)
+                .setInputData(new Data.Builder().putLong(WORK_DATA_MEDIA_ID, mediaId).build())
+                .build();
     }
 
     public static String uniqueWorkName(long mediaId) {
@@ -173,12 +174,6 @@ public class AdScanWorker extends Worker {
 
     public static LiveData<List<WorkInfo>> observe(Context context, long mediaId) {
         return WorkManager.getInstance(context).getWorkInfosForUniqueWorkLiveData(uniqueWorkName(mediaId));
-    }
-
-    @NonNull
-    @Override
-    public ListenableFuture<ForegroundInfo> getForegroundInfoAsync() {
-        return Futures.immediateFuture(createForegroundInfo(null));
     }
 
     private ForegroundInfo createForegroundInfo(@Nullable String episodeTitle) {
