@@ -102,7 +102,12 @@ public class MediaDownloadedHandler implements Runnable {
                 // to ensure subscribers will get the updated FeedMedia as well
                 DBWriter.setFeedItem(item, broadcastUnreadStateUpdate).get();
             }
-            AdScanWorker.enqueue(context, media);
+            try {
+                AdScanWorker.enqueue(context, media);
+            } catch (RuntimeException e) {
+                // An optional extra must never fail the download: the caller deletes the file on any exception
+                Log.e(TAG, "Could not queue ad scan", e);
+            }
         } catch (InterruptedException e) {
             Log.e(TAG, "MediaHandlerThread was interrupted");
         } catch (ExecutionException e) {

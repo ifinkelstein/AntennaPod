@@ -1,6 +1,7 @@
 package de.danoeh.antennapod.ui.episodeslist;
 
 import android.content.Context;
+import android.util.Log;
 
 import de.danoeh.antennapod.R;
 import de.danoeh.antennapod.event.MessageEvent;
@@ -17,6 +18,8 @@ import java.util.List;
  * Starts ad scans for episodes that are already on the device.
  */
 public final class AdScanActions {
+    private static final String TAG = "AdScanActions";
+
     private AdScanActions() {
     }
 
@@ -35,7 +38,7 @@ public final class AdScanActions {
     public static void scanEpisodes(Context context, List<FeedItem> items) {
         Context appContext = context.getApplicationContext();
         List<FeedItem> episodes = new ArrayList<>(items);
-        Schedulers.io().scheduleDirect(() -> {
+        runSafely(appContext, () -> {
             int count = 0;
             for (FeedItem item : episodes) {
                 if (AdScanWorker.canScan(item.getMedia())) {
@@ -52,8 +55,22 @@ public final class AdScanActions {
      */
     public static void scanFeed(Context context, Feed feed) {
         Context appContext = context.getApplicationContext();
-        Schedulers.io().scheduleDirect(() ->
+        runSafely(appContext, () ->
                 showResult(appContext, AdScanWorker.enqueueDownloadedEpisodes(appContext, feed)));
+    }
+
+    /**
+     * An exception on a bare background thread kills the app, so failures are reported instead.
+     */
+    private static void runSafely(Context context, Runnable action) {
+        Schedulers.io().scheduleDirect(() -> {
+            try {
+                action.run();
+            } catch (RuntimeException e) {
+                Log.e(TAG, "Could not start ad detection", e);
+                EventBus.getDefault().post(new MessageEvent(context.getString(R.string.ad_scan_start_failed)));
+            }
+        });
     }
 
     private static void showResult(Context context, int count) {

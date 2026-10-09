@@ -145,10 +145,17 @@ public class AdScanWorker extends Worker {
         } catch (Exception e) {
             Log.e(TAG, "Could not store pending scan", e);
         }
-        OneTimeWorkRequest request = buildRequest(media.getId(), UserPreferences.isAllowMobileEpisodeDownload());
-        // KEEP: a scan that is already queued or running continues instead of being started twice
-        WorkManager.getInstance(context).enqueueUniqueWork(uniqueWorkName(media.getId()),
-                ExistingWorkPolicy.KEEP, request);
+        try {
+            OneTimeWorkRequest request = buildRequest(media.getId(), UserPreferences.isAllowMobileEpisodeDownload());
+            // KEEP: a scan that is already queued or running continues instead of being started twice
+            WorkManager.getInstance(context).enqueueUniqueWork(uniqueWorkName(media.getId()),
+                    ExistingWorkPolicy.KEEP, request);
+        } catch (RuntimeException e) {
+            // Callers run in downloads and UI actions; a scheduling problem must not take them down
+            Log.e(TAG, "Could not schedule ad scan for " + media.getEpisodeTitle(), e);
+            DBWriter.setAdScan(new AdScan(media.getId(), AdScan.STATE_FAILED, media.getDownloadDate(),
+                    Collections.emptyList()));
+        }
     }
 
     /**
@@ -216,21 +223,27 @@ public class AdScanWorker extends Worker {
         long mediaId = getInputData().getLong(WORK_DATA_MEDIA_ID, -1);
         FeedMedia media = DBReader.getFeedMedia(mediaId);
         if (media == null || media.getLocalFileUrl() == null) {
+            Log.w(TAG, "Not scanning media " + mediaId + ": no longer downloaded");
             return Result.success();
         }
         if (!isEnabled()) {
             // Stay pending so the scan resumes once the feature is configured again
+            Log.w(TAG, "Not scanning " + media.getEpisodeTitle() + ": ad skipping is off or has no API key");
             return Result.success();
         }
         File file = new File(media.getLocalFileUrl());
-        if (!file.exists()) {
-            return Result.success();
-        }
         long downloadDate = media.getDownloadDate();
-        if (media.getDuration() > MAX_DURATION_MS) {
+        if (!file.exists()) {
+            Log.w(TAG, "Not scanning " + media.getEpisodeTitle() + ": file is missing " + file);
             finish(mediaId, AdScan.STATE_SKIPPED, downloadDate, Collections.emptyList());
             return Result.success();
         }
+        if (media.getDuration() > MAX_DURATION_MS) {
+            Log.w(TAG, "Not scanning " + media.getEpisodeTitle() + ": longer than 3 hours");
+            finish(mediaId, AdScan.STATE_SKIPPED, downloadDate, Collections.emptyList());
+            return Result.success();
+        }
+        Log.d(TAG, "Scanning " + media.getEpisodeTitle());
 
         DeepInfraClient client = new DeepInfraClient(UserPreferences.getDeepInfraApiKey(),
                 UserPreferences.getAdSkipTranscriptionUrl(), UserPreferences.getAdSkipTranscriptionModel(),
